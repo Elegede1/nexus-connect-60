@@ -32,11 +32,17 @@ class Property(models.Model):
         max_digits=12,
         decimal_places=2,
         validators=[MinValueValidator(0)],
-        help_text="Monthly rent in Naira"
+        help_text="Rent amount in Naira"
+    )
+    duration = models.PositiveIntegerField(
+        default=1,
+        help_text="Rental duration in years"
     )
     
     # Location fields
-    location = models.CharField(max_length=255, help_text="City or address")
+    state = models.CharField(max_length=100, help_text="State (e.g. Lagos)", default="")
+    city = models.CharField(max_length=100, help_text="City/Area (e.g. Ikeja)", default="")
+    location = models.CharField(max_length=255, help_text="Full Address")
     zip_code = models.CharField(max_length=20, blank=True, null=True)
     latitude = models.DecimalField(
         max_digits=9,

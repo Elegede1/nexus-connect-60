@@ -19,6 +19,7 @@ class CustomUser(AbstractUser):
     )
     phone_number = models.CharField(max_length=20, blank=True, null=True)
     avatar = models.ImageField(upload_to='avatars/', blank=True, null=True)
+    cover_photo = models.ImageField(upload_to='covers/', blank=True, null=True)
     email_notifications = models.BooleanField(
         default=True,
         help_text="Receive email notifications"

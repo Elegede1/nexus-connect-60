@@ -125,3 +125,21 @@ def mark_messages_read(request, room_id):
             {'error': 'Chat room not found'},
             status=status.HTTP_404_NOT_FOUND
         )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def unread_count(request):
+    """
+    Get total unread message count for the authenticated user across all rooms.
+    """
+    user = request.user
+    
+    # Count unread messages in all rooms where user is participant
+    # excludes messages sent by the user themselves
+    count = Message.objects.filter(
+        room__in=ChatRoom.objects.filter(Q(landlord=user) | Q(tenant=user)),
+        is_read=False
+    ).exclude(sender=user).count()
+    
+    return Response({'count': count})

@@ -23,7 +23,7 @@ class PropertyListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Property
         fields = [
-            'id', 'title', 'price', 'location', 'property_type',
+            'id', 'title', 'price', 'duration', 'location', 'state', 'city', 'property_type',
             'num_bedrooms', 'num_bathrooms', 'is_premium',
             'cover_image', 'landlord_name', 'amenities_list',
             'view_count', 'save_count', 'created_at'
@@ -55,8 +55,8 @@ class PropertyDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Property
         fields = [
-            'id', 'landlord', 'title', 'description', 'price',
-            'location', 'zip_code', 'latitude', 'longitude',
+            'id', 'landlord', 'title', 'description', 'price', 'duration',
+            'location', 'state', 'city', 'zip_code', 'latitude', 'longitude',
             'property_type', 'num_bedrooms', 'num_bathrooms',
             'amenities_list', 'is_premium', 'images',
             'view_count', 'save_count', 'is_saved',
@@ -97,7 +97,7 @@ class PropertyCreateUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Property
         fields = [
-            'id', 'title', 'description', 'price', 'location', 'zip_code',
+            'id', 'title', 'description', 'price', 'duration', 'location', 'state', 'city', 'zip_code',
             'latitude', 'longitude', 'property_type', 'num_bedrooms',
             'num_bathrooms', 'amenities_list', 'is_premium', 'image_urls'
         ]
