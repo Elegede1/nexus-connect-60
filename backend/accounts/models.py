@@ -18,8 +18,9 @@ class CustomUser(AbstractUser):
         help_text="User role: Landlord or Tenant. Cannot be changed after creation."
     )
     phone_number = models.CharField(max_length=20, blank=True, null=True)
-    avatar = models.ImageField(upload_to='avatars/', blank=True, null=True)
-    cover_photo = models.ImageField(upload_to='covers/', blank=True, null=True)
+    avatar = models.URLField(max_length=500, blank=True, null=True)
+    cover_photo = models.URLField(max_length=500, blank=True, null=True)
+    bio = models.TextField(blank=True, null=True, help_text="Short bio or tagline for the user profile")
     email_notifications = models.BooleanField(
         default=True,
         help_text="Receive email notifications"
@@ -62,3 +63,30 @@ class CustomUser(AbstractUser):
         verbose_name = 'User'
         verbose_name_plural = 'Users'
         ordering = ['-created_at']
+
+
+class Follow(models.Model):
+    """
+    Model to track user following relationships.
+    Tenants can follow Landlords.
+    """
+    follower = models.ForeignKey(
+        CustomUser, 
+        on_delete=models.CASCADE, 
+        related_name='following',
+        help_text="The user (Tenant) who follows"
+    )
+    following = models.ForeignKey(
+        CustomUser, 
+        on_delete=models.CASCADE, 
+        related_name='followers',
+        help_text="The user (Landlord) being followed"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('follower', 'following')
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.follower.username} follows {self.following.username}"

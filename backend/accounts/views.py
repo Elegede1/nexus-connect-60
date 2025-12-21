@@ -70,6 +70,16 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
         return self.request.user
 
 
+class PublicUserProfileView(generics.RetrieveAPIView):
+    """
+    API endpoint to view another user's public profile (e.g. Tenant viewing Landlord).
+    """
+    permission_classes = [IsAuthenticated]
+    serializer_class = UserSerializer
+    queryset = User.objects.all()
+    lookup_field = 'pk'
+
+
 class NotificationPreferenceView(generics.RetrieveUpdateAPIView):
     """
     API endpoint to manage notification preferences.
@@ -115,3 +125,74 @@ def logout_view(request):
     return Response({
         'message': 'Logged out successfully. Please delete your token on the client side.'
     }, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def platform_metrics(request):
+    """
+    Get platform-wide metrics for the home page.
+    - verified_users: Count of active users.
+    - successful_matches: Count of confirmed leases.
+    - avg_match_time: Average time from property creation to lease confirmation.
+    """
+    from reviews.models import Review
+    from django.db.models import Avg, F
+    
+    verified_users = User.objects.filter(is_active=True).count()
+    successful_matches = Review.objects.count() # Using reviews as proxy for now
+    
+    # Placeholder for avg time as we don't have lease data yet
+    avg_hours = 0
+    
+    return Response({
+        'verified_users': verified_users,
+        'successful_matches': successful_matches,
+        'avg_match_time': "24h" # Placeholder
+    })
+
+
+@api_view(['POST', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def follow_user(request, user_id):
+    """
+    Toggle follow status for a user (landlord).
+    POST: Follow
+    DELETE: Unfollow
+    """
+    from .models import Follow
+    
+    follower = request.user
+    
+    try:
+        following = User.objects.get(pk=user_id)
+    except User.DoesNotExist:
+        return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+    if follower == following:
+        return Response({'error': 'You cannot follow yourself'}, status=status.HTTP_400_BAD_REQUEST)
+        
+    if request.method == 'POST':
+        follow, created = Follow.objects.get_or_create(follower=follower, following=following)
+        if created:
+            return Response({'message': f'You are now following {following.username}'}, status=status.HTTP_201_CREATED)
+        else:
+            return Response({'message': f'You are already following {following.username}'}, status=status.HTTP_200_OK)
+            
+    elif request.method == 'DELETE':
+        Follow.objects.filter(follower=follower, following=following).delete()
+        return Response({'message': f'You unfollowed {following.username}'}, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def check_follow_status(request, user_id):
+    """
+    Check if the authenticated user is following the specified user.
+    """
+    from .models import Follow
+    
+    follower = request.user
+    is_following = Follow.objects.filter(follower=follower, following_id=user_id).exists()
+    
+    return Response({'is_following': is_following})

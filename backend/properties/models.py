@@ -34,10 +34,7 @@ class Property(models.Model):
         validators=[MinValueValidator(0)],
         help_text="Rent amount in Naira"
     )
-    duration = models.PositiveIntegerField(
-        default=1,
-        help_text="Rental duration in years"
-    )
+    # Duration removed
     
     # Location fields
     state = models.CharField(max_length=100, help_text="State (e.g. Lagos)", default="")
@@ -67,7 +64,12 @@ class Property(models.Model):
     )
     num_bathrooms = models.PositiveIntegerField(
         validators=[MinValueValidator(0)],
-        help_text="Number of bathrooms/toilets"
+        help_text="Number of bathrooms"
+    )
+    num_toilets = models.PositiveIntegerField(
+        validators=[MinValueValidator(0)],
+        default=0,
+        help_text="Number of toilets"
     )
     amenities = models.TextField(
         blank=True,
@@ -168,6 +170,30 @@ class PropertyImage(models.Model):
         super().save(*args, **kwargs)
 
 
+class PropertyVideo(models.Model):
+    """
+    Property videos stored in Supabase Storage.
+    Supports multiple videos per property (though currently min 1 required).
+    """
+    
+    property = models.ForeignKey(
+        Property,
+        on_delete=models.CASCADE,
+        related_name='videos'
+    )
+    video_url = models.URLField(
+        max_length=500,
+        help_text="Supabase Storage public URL"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return f"Video for {self.property.title}"
+    
+    class Meta:
+        ordering = ['created_at']
+
+
 class SavedProperty(models.Model):
     """
     Tenant's saved/favorited properties.
@@ -194,3 +220,31 @@ class SavedProperty(models.Model):
     
     def __str__(self):
         return f"{self.tenant.email} saved {self.property.title}"
+
+
+class PropertyView(models.Model):
+    """
+    Tracks unique property views per user or session.
+    """
+    property = models.ForeignKey(
+        Property,
+        on_delete=models.CASCADE,
+        related_name='views'
+    )
+    user = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True
+    )
+    session_key = models.CharField(max_length=40, null=True, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Property View'
+        verbose_name_plural = 'Property Views'
+        ordering = ['-timestamp']
+        
+    def __str__(self):
+        return f"View for {self.property.title} at {self.timestamp}"

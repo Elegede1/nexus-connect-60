@@ -1,162 +1,66 @@
-from rest_framework import generics, status
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework import generics, permissions, status
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import api_view, permission_classes
+from .models import Review
+from .serializers import ReviewSerializer
 from django.contrib.auth import get_user_model
-from .models import LeaseConfirmation, Review
-from properties.models import Property
-from .serializers import (
-    LeaseConfirmationSerializer,
-    LeaseConfirmationCreateSerializer,
-    ReviewSerializer,
-    ReviewCreateSerializer
-)
 
 User = get_user_model()
 
+class CreateReviewView(generics.CreateAPIView):
+    """
+    Create a new review for a landlord.
+    Only tenants can create reviews.
+    """
+    serializer_class = ReviewSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def confirm_lease(request):
+    def perform_create(self, serializer):
+        if not self.request.user.is_tenant():
+            raise permissions.PermissionDenied("Only tenants can leave reviews.")
+        serializer.save(tenant=self.request.user)
+
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+def landlord_reviews(request, landlord_id):
     """
-    Landlord confirms a lease with a tenant for a property.
+    Get all reviews for a specific landlord.
     """
-    if not request.user.is_landlord():
-        return Response(
-            {'error': 'Only landlords can confirm leases'},
-            status=status.HTTP_403_FORBIDDEN
-        )
+    reviews = Review.objects.filter(landlord_id=landlord_id)
+    serializer = ReviewSerializer(reviews, many=True)
     
-    serializer = LeaseConfirmationCreateSerializer(data=request.data)
-    serializer.is_valid(raise_exception=True)
-    
-    property_id = serializer.validated_data['property_id']
-    tenant_id = serializer.validated_data['tenant_id']
-    notes = serializer.validated_data.get('notes', '')
-    
-    # Get property and verify ownership
-    try:
-        property_obj = Property.objects.get(pk=property_id, landlord=request.user)
-    except Property.DoesNotExist:
-        return Response(
-            {'error': 'Property not found or you are not the owner'},
-            status=status.HTTP_404_NOT_FOUND
-        )
-    
-    # Get tenant
-    try:
-        tenant = User.objects.get(pk=tenant_id, role='TENANT')
-    except User.DoesNotExist:
-        return Response(
-            {'error': 'Tenant not found'},
-            status=status.HTTP_404_NOT_FOUND
-        )
-    
-    # Create or get lease confirmation
-    lease, created = LeaseConfirmation.objects.get_or_create(
-        property=property_obj,
-        landlord=request.user,
-        tenant=tenant,
-        defaults={'notes': notes}
-    )
-    
+    # Calculate aggregate stats
+    total_reviews = reviews.count()
+    avg_rating = 0
+    if total_reviews > 0:
+        avg_rating = sum(r.rating for r in reviews) / total_reviews
+        
     return Response({
-        'lease': LeaseConfirmationSerializer(lease).data,
-        'created': created
-    }, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+        'reviews': serializer.data,
+        'total_reviews': total_reviews,
+        'average_rating': round(avg_rating, 1)
+    })
 
 
-class LeaseListView(generics.ListAPIView):
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+def recent_reviews(request):
     """
-    List lease confirmations for the authenticated user.
-    Landlords see their confirmed leases, tenants see leases they're part of.
+    Get the latest reviews for public display (testimonials).
+    Returns up to 5 recent reviews.
     """
-    serializer_class = LeaseConfirmationSerializer
-    permission_classes = [IsAuthenticated]
+    reviews = Review.objects.select_related('tenant', 'landlord').order_by('-created_at')[:5]
     
-    def get_queryset(self):
-        user = self.request.user
-        if user.is_landlord():
-            return LeaseConfirmation.objects.filter(landlord=user).select_related('property', 'tenant')
-        elif user.is_tenant():
-            return LeaseConfirmation.objects.filter(tenant=user).select_related('property', 'landlord')
-        return LeaseConfirmation.objects.none()
-
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def create_review(request):
-    """
-    Tenant creates a review for a property/landlord after lease confirmation.
-    """
-    if not request.user.is_tenant():
-        return Response(
-            {'error': 'Only tenants can create reviews'},
-            status=status.HTTP_403_FORBIDDEN
-        )
+    data = []
+    for review in reviews:
+        data.append({
+            'id': review.id,
+            'name': f"{review.tenant.first_name or 'User'} {review.tenant.last_name[0] if review.tenant.last_name else ''}.",
+            'role': 'Tenant',
+            'content': review.comment,
+            'rating': review.rating,
+            'avatar': review.tenant.first_name[0].upper() if review.tenant.first_name else 'U',
+            'created_at': review.created_at.isoformat(),
+        })
     
-    serializer = ReviewCreateSerializer(data=request.data)
-    serializer.is_valid(raise_exception=True)
-    
-    lease_conf_id = serializer.validated_data.pop('lease_confirmation_id')
-    
-    # Get lease confirmation
-    try:
-        lease = LeaseConfirmation.objects.select_related('property', 'landlord').get(
-            pk=lease_conf_id,
-            tenant=request.user
-        )
-    except LeaseConfirmation.DoesNotExist:
-        return Response(
-            {'error': 'Lease confirmation not found or you are not the tenant'},
-            status=status.HTTP_404_NOT_FOUND
-        )
-    
-    # Check if review already exists
-    if hasattr(lease, 'review'):
-        return Response(
-            {'error': 'You have already reviewed this lease'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
-    
-    # Create review
-    review = Review.objects.create(
-        lease_confirmation=lease,
-        property=lease.property,
-        landlord=lease.landlord,
-        tenant=request.user,
-        **serializer.validated_data
-    )
-    
-    return Response(
-        ReviewSerializer(review).data,
-        status=status.HTTP_201_CREATED
-    )
-
-
-class PropertyReviewsView(generics.ListAPIView):
-    """
-    List public reviews for a specific property.
-    """
-    serializer_class = ReviewSerializer
-    
-    def get_queryset(self):
-        property_id = self.kwargs['property_id']
-        return Review.objects.filter(
-            property_id=property_id,
-            is_public=True
-        ).select_related('tenant', 'property', 'landlord')
-
-
-class LandlordReviewsView(generics.ListAPIView):
-    """
-    List public reviews for a specific landlord.
-    """
-    serializer_class = ReviewSerializer
-    
-    def get_queryset(self):
-        landlord_id = self.kwargs['landlord_id']
-        return Review.objects.filter(
-            landlord_id=landlord_id,
-            is_public=True
-        ).select_related('tenant', 'property', 'landlord')
+    return Response(data)

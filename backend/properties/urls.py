@@ -7,7 +7,10 @@ from .views import (
     SavedPropertiesView,
     save_property,
     unsave_property,
-    landlord_analytics
+    landlord_analytics,
+    similar_properties,
+    DeletePropertyImageView,
+    DeletePropertyVideoView
 )
 
 app_name = 'properties'
@@ -16,6 +19,9 @@ urlpatterns = [
     # Property CRUD
     path('', PropertyListCreateView.as_view(), name='property-list-create'),
     path('<int:pk>/', PropertyDetailView.as_view(), name='property-detail'),
+    path('images/<int:pk>/delete/', DeletePropertyImageView.as_view(), name='delete-property-image'),
+    path('videos/<int:pk>/delete/', DeletePropertyVideoView.as_view(), name='delete-property-video'),
+    path('<int:pk>/similar/', similar_properties, name='similar-properties'),
     
     # Featured/Premium
     path('featured/', FeaturedPropertiesView.as_view(), name='featured-properties'),

@@ -1,21 +1,8 @@
 from django.urls import path
-from .views import (
-    confirm_lease,
-    LeaseListView,
-    create_review,
-    PropertyReviewsView,
-    LandlordReviewsView
-)
-
-app_name = 'reviews'
+from .views import CreateReviewView, landlord_reviews, recent_reviews
 
 urlpatterns = [
-    # Lease confirmations
-    path('leases/confirm/', confirm_lease, name='confirm-lease'),
-    path('leases/', LeaseListView.as_view(), name='lease-list'),
-    
-    # Reviews
-    path('create/', create_review, name='create-review'),
-    path('property/<int:property_id>/', PropertyReviewsView.as_view(), name='property-reviews'),
-    path('landlord/<int:landlord_id>/', LandlordReviewsView.as_view(), name='landlord-reviews'),
+    path('create/', CreateReviewView.as_view(), name='create-review'),
+    path('landlord/<int:landlord_id>/', landlord_reviews, name='landlord-reviews'),
+    path('recent/', recent_reviews, name='recent-reviews'),
 ]

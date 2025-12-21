@@ -3,7 +3,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.db.models import Q
-from .models import Property, SavedProperty
+from .models import Property, SavedProperty, PropertyImage, PropertyVideo, PropertyView
 from .serializers import (
     PropertyListSerializer,
     PropertyDetailSerializer,
@@ -11,6 +11,31 @@ from .serializers import (
     SavedPropertySerializer
 )
 from .permissions import IsLandlordOrReadOnly, IsPropertyOwner
+
+# ... (existing imports)
+
+class DeletePropertyImageView(generics.DestroyAPIView):
+    """
+    Delete a specific property image.
+    Only the landlord who owns the property can delete.
+    """
+    queryset = PropertyImage.objects.all()
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        # Ensure user can only delete images of their own properties
+        return PropertyImage.objects.filter(property__landlord=self.request.user)
+
+class DeletePropertyVideoView(generics.DestroyAPIView):
+    """
+    Delete a specific property video.
+    Only the landlord who owns the property can delete.
+    """
+    queryset = PropertyVideo.objects.all()
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return PropertyVideo.objects.filter(property__landlord=self.request.user)
 
 
 class PropertyListCreateView(generics.ListCreateAPIView):
@@ -36,7 +61,7 @@ class PropertyListCreateView(generics.ListCreateAPIView):
     def get_queryset(self):
         queryset = Property.objects.select_related('landlord').prefetch_related('images')
         
-        # Search filters
+        state = self.request.query_params.get('state')
         city = self.request.query_params.get('city')
         zip_code = self.request.query_params.get('zip_code')
         min_price = self.request.query_params.get('min_price')
@@ -47,8 +72,11 @@ class PropertyListCreateView(generics.ListCreateAPIView):
         amenities = self.request.query_params.get('amenities')
         search = self.request.query_params.get('search')
         
-        if city:
-            queryset = queryset.filter(location__icontains=city)
+        if state and state != 'All States':
+            queryset = queryset.filter(state__iexact=state)
+        
+        if city and city != 'All Cities':
+            queryset = queryset.filter(city__iexact=city)
         
         if zip_code:
             queryset = queryset.filter(zip_code=zip_code)
@@ -93,7 +121,7 @@ class PropertyDetailView(generics.RetrieveUpdateDestroyAPIView):
     Increments view count on retrieval.
     Only owner can update/delete.
     """
-    queryset = Property.objects.select_related('landlord').prefetch_related('images')
+    queryset = Property.objects.select_related('landlord').prefetch_related('images', 'videos')
     permission_classes = [IsPropertyOwner]
     
     def get_serializer_class(self):
@@ -104,9 +132,38 @@ class PropertyDetailView(generics.RetrieveUpdateDestroyAPIView):
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
         
-        # Increment view count (but not for the property owner)
+        # Unique view tracking
         if not (request.user.is_authenticated and request.user == instance.landlord):
-            instance.increment_views()
+            # Get common identifiers
+            user = request.user if request.user.is_authenticated else None
+            session_key = request.session.session_key
+            if not session_key:
+                request.session.create()
+                session_key = request.session.session_key
+            
+            # Use X-Forwarded-For if behind a proxy
+            x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+            if x_forwarded_for:
+                ip = x_forwarded_for.split(',')[0]
+            else:
+                ip = request.META.get('REMOTE_ADDR')
+
+            # Check for existing unique view
+            view_exists = False
+            if user:
+                view_exists = PropertyView.objects.filter(property=instance, user=user).exists()
+            else:
+                view_exists = PropertyView.objects.filter(property=instance, session_key=session_key).exists()
+            
+            if not view_exists:
+                PropertyView.objects.create(
+                    property=instance,
+                    user=user,
+                    session_key=session_key,
+                    ip_address=ip
+                )
+                # Still increment the counter for performance/backwards compatibility
+                instance.increment_views()
         
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
@@ -215,15 +272,45 @@ def landlord_analytics(request):
     
     properties = Property.objects.filter(landlord=request.user)
     
-    total_views = sum(p.view_count for p in properties)
+    # Count unique views (PropertyView records already represent unique user/session views)
+    total_views = PropertyView.objects.filter(property__landlord=request.user).count()
     total_saves = sum(p.save_count for p in properties)
     total_properties = properties.count()
     
-    # TODO: Add message count when chat app is implemented
+    # Get reviews for this landlord
+    from reviews.models import Review
+    from django.db.models import Avg
+    landlord_reviews = Review.objects.filter(landlord=request.user)
+    total_reviews = landlord_reviews.count()
+    avg_rating = landlord_reviews.aggregate(Avg('rating'))['rating__avg'] or 0.0
     
     return Response({
         'total_properties': total_properties,
         'total_views': total_views,
         'total_saves': total_saves,
+        'total_reviews': total_reviews,
+        'average_rating': round(avg_rating, 1),
         'properties': PropertyListSerializer(properties, many=True).data
     })
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def similar_properties(request, pk):
+    """
+    Get similar properties based on location and type.
+    """
+    try:
+        property_obj = Property.objects.get(pk=pk)
+    except Property.DoesNotExist:
+        return Response({'error': 'Property not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    # Logic: Same state OR same city OR same property type
+    # Exclude current property
+    similar = Property.objects.filter(
+        Q(state__iexact=property_obj.state) | 
+        Q(property_type=property_obj.property_type)
+    ).exclude(id=property_obj.id).order_by('?')[:4] # Random 4
+    
+    serializer = PropertyListSerializer(similar, many=True)
+    return Response(serializer.data)

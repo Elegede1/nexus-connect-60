@@ -4,7 +4,8 @@ from .views import (
     ChatMessageListView,
     create_or_get_chat_room,
     mark_messages_read,
-    unread_count
+    unread_count,
+    send_message
 )
 
 app_name = 'chat'
@@ -13,6 +14,7 @@ urlpatterns = [
     path('rooms/', ChatRoomListView.as_view(), name='room-list'),
     path('rooms/create/', create_or_get_chat_room, name='room-create'),
     path('rooms/<int:room_id>/messages/', ChatMessageListView.as_view(), name='message-list'),
+    path('rooms/<int:room_id>/messages/send/', send_message, name='send-message'),
     path('rooms/<int:room_id>/mark-read/', mark_messages_read, name='mark-read'),
     path('unread-count/', unread_count, name='unread-count'),
 ]

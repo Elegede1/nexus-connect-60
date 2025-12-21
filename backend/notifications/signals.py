@@ -1,7 +1,7 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from chat.models import Message
-from reviews.models import Review, LeaseConfirmation
+from reviews.models import Review
 from properties.models import Property
 from .models import Notification
 
@@ -53,22 +53,6 @@ def create_review_notification(sender, instance, created, **kwargs):
                 user=instance.landlord,
                 type=Notification.NotificationType.REVIEW_POSTED,
                 title='New Review',
-                message=f'You received a new review from {instance.tenant.username}',
-                related_review_id=instance.id,
-                related_property_id=instance.property.id
-            )
-
-
-@receiver(post_save, sender=LeaseConfirmation)
-def create_lease_confirmation_notification(sender, instance, created, **kwargs):
-    """Create notification when a lease is confirmed"""
-    if created:
-        # Notify the tenant
-        if instance.tenant.push_notifications or instance.tenant.email_notifications:
-            Notification.objects.create(
-                user=instance.tenant,
-                type=Notification.NotificationType.LEASE_CONFIRMED,
-                title='Lease Confirmed',
-                message=f'Your lease for {instance.property.title} has been confirmed',
-                related_property_id=instance.property.id
+                message=f'You received a new review from {instance.tenant.first_name}',
+                related_review_id=instance.id
             )

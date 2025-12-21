@@ -143,3 +143,52 @@ def unread_count(request):
     ).exclude(sender=user).count()
     
     return Response({'count': count})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def send_message(request, room_id):
+    """
+    Send a message in a chat room.
+    User must be either landlord or tenant of the room.
+    """
+    user = request.user
+    
+    try:
+        room = ChatRoom.objects.get(pk=room_id)
+        
+        # Verify user has access to this room
+        if user != room.landlord and user != room.tenant:
+            return Response(
+                {'error': 'Access denied'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        content = request.data.get('content', '').strip()
+        if not content:
+            return Response(
+                {'error': 'Message content is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Create the message
+        message = Message.objects.create(
+            room=room,
+            sender=user,
+            content=content
+        )
+        
+        # Update room's updated_at timestamp
+        room.save()
+        
+        return Response(
+            MessageSerializer(message).data,
+            status=status.HTTP_201_CREATED
+        )
+        
+    except ChatRoom.DoesNotExist:
+        return Response(
+            {'error': 'Chat room not found'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+

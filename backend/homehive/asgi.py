@@ -15,13 +15,14 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'homehive.settings')
 # is populated before importing code that may import ORM models.
 django_asgi_app = get_asgi_application()
 
-# Import chat routing after Django setup
+# Import chat routing and middleware after Django setup
 from chat.routing import websocket_urlpatterns
+from .middleware import TokenAuthMiddleware
 
 application = ProtocolTypeRouter({
     "http": django_asgi_app,
     "websocket": AllowedHostsOriginValidator(
-        AuthMiddlewareStack(
+        TokenAuthMiddleware(
             URLRouter(websocket_urlpatterns)
         )
     ),
