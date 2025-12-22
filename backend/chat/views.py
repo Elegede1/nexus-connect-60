@@ -71,9 +71,9 @@ def create_or_get_chat_room(request):
     }, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
 
-class ChatMessageListView(generics.ListAPIView):
+class ChatMessageListView(generics.ListCreateAPIView):
     """
-    List messages for a specific chat room.
+    List messages for a specific chat room or send a new message.
     Paginated with oldest first.
     """
     serializer_class = MessageSerializer
@@ -92,6 +92,86 @@ class ChatMessageListView(generics.ListAPIView):
             return Message.objects.none()
         
         return Message.objects.filter(room_id=room_id).select_related('sender')
+
+    def create(self, request, *args, **kwargs):
+        room_id = self.kwargs['room_id']
+        user = request.user
+        
+        try:
+            room = ChatRoom.objects.get(pk=room_id)
+        except ChatRoom.DoesNotExist:
+             return Response(
+                {'error': 'Chat room not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if user != room.landlord and user != room.tenant:
+             return Response(
+                {'error': 'Access denied'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        # Save message
+        message = serializer.save(sender=user, room=room)
+        
+        # Update room's updated_at timestamp used for sorting conversations
+        room.save()
+        
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+
+class ChatMessageDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """
+    Retrieve, update or delete a chat message.
+    Only the sender can update or delete their message.
+    """
+    queryset = Message.objects.all()
+    serializer_class = MessageSerializer
+    permission_classes = [IsAuthenticated]
+
+    def perform_destroy(self, instance):
+        if instance.sender != self.request.user:
+            raise PermissionDenied("You can only delete your own messages.")
+        instance.delete()
+
+    def perform_update(self, serializer):
+        if serializer.instance.sender != self.request.user:
+            raise PermissionDenied("You can only edit your own messages.")
+        serializer.save()
+    
+    def update(self, request, *args, **kwargs):
+        """Custom update to check permissions explicitly if needed, but perform_update handles it."""
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        if instance.sender != request.user:
+             return Response(
+                {'error': 'You can only edit your own messages.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        if getattr(instance, '_prefetched_objects_cache', None):
+            # If 'prefetch_related' has been applied to a queryset, we need to
+            # forcibly invalidate the prefetch cache on the instance.
+            instance._prefetched_objects_cache = {}
+
+        return Response(serializer.data)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.sender != request.user:
+             return Response(
+                {'error': 'You can only delete your own messages.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        self.perform_destroy(instance)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 @api_view(['PATCH'])

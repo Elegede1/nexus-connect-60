@@ -98,7 +98,14 @@ export function Navbar() {
     fetchCounts(token);
     // Poll every 30 seconds
     const interval = setInterval(() => fetchCounts(token), 30000);
-    return () => clearInterval(interval);
+
+    const handleRefresh = () => fetchCounts(token);
+    window.addEventListener('refresh-notifications', handleRefresh);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('refresh-notifications', handleRefresh);
+    };
   }, [token, API_URL, refreshAccessToken]);
 
   const markAllNotificationsRead = async () => {
@@ -206,7 +213,7 @@ export function Navbar() {
                 <link.icon className="w-4 h-4" />
                 {link.name}
                 {link.name === 'Messages' && unreadCount > 0 && (
-                  <span className="absolute -top-2 -right-3 bg-red-500 text-white text-[10px] font-bold px-1.5 rounded-full min-w-[18px] h-[18px] flex items-center justify-center">
+                  <span className="absolute -top-1.5 -right-2 bg-red-500 text-white text-[9px] font-bold px-1 rounded-full min-w-[14px] h-[14px] flex items-center justify-center">
                     {unreadCount}
                   </span>
                 )}
@@ -227,7 +234,7 @@ export function Navbar() {
                     <Button variant="ghost" size="icon" className="relative rounded-full hover:bg-muted/50">
                       <Bell className="w-5 h-5 text-muted-foreground" />
                       {unreadNotifications > 0 && (
-                        <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-background" />
+                        <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-background" />
                       )}
                     </Button>
                   </DropdownMenuTrigger>

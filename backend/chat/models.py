@@ -61,6 +61,13 @@ class Message(models.Model):
         related_name='sent_messages'
     )
     content = models.TextField()
+    reply_to = models.ForeignKey(
+        'self',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='replies'
+    )
     is_read = models.BooleanField(default=False)
     timestamp = models.DateTimeField(auto_now_add=True)
     

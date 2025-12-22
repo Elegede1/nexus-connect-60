@@ -8,7 +8,16 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Send, Search, MoreVertical, Phone, Video, Info, ArrowLeft, MessageSquare, Check, CheckCheck } from 'lucide-react';
+import {
+  Loader2, Send, Search, MoreVertical, Phone, Video, Info, ArrowLeft, MessageSquare, Check, CheckCheck,
+  Edit, Trash2, Reply, X
+} from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -29,6 +38,12 @@ interface Message {
   content: string;
   is_read: boolean;
   timestamp: string;
+  reply_to?: number;
+  reply_to_info?: {
+    id: number;
+    sender_name: string;
+    content: string;
+  };
 }
 
 interface ChatRoom {
@@ -59,6 +74,33 @@ export default function Messages() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
+  const [editingMessage, setEditingMessage] = useState<Message | null>(null);
+  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+
+  const handleEditMessage = (message: Message) => {
+    setNewMessage(message.content);
+    setEditingMessage(message);
+  };
+
+  const handleDeleteMessage = async (messageId: number) => {
+    if (!confirm("Are you sure you want to delete this message?")) return;
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/chat/messages/${messageId}/`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (response.ok) {
+        setMessages(prev => prev.filter(m => m.id !== messageId));
+        fetchConversations();
+      } else {
+        toast({ title: "Failed to delete message", variant: "destructive" });
+      }
+    } catch (error) {
+      console.error("Error deleting message", error);
+    }
+  };
 
   useEffect(() => {
     fetchConversations();
@@ -144,6 +186,20 @@ export default function Messages() {
       fetchMessages(selectedChat.id);
       connectWebSocket();
 
+      // Dispatch event to refresh nav notifications immediately
+      // This assumes the backend handles mark-read logic or we call it explicitly
+      // Ideally we should call mark-read endpoint here if not already done by fetchMessages (which is GET)
+
+      // Call mark-as-read
+      fetch(`${import.meta.env.VITE_API_URL}/api/chat/rooms/${selectedChat.id}/mark-read/`, {
+        method: 'PATCH',
+        headers: { 'Authorization': `Bearer ${token}` }
+      }).then(() => {
+        // Dispatch custom event for Navbar to pick up
+        window.dispatchEvent(new CustomEvent('refresh-notifications'));
+      }).catch(err => console.error("Failed to mark read", err));
+
+
       return () => {
         if (socketRef.current) {
           socketRef.current.close();
@@ -210,29 +266,48 @@ export default function Messages() {
     // Backend consumer has receive() method that creates message.
 
     // Let's use WebSocket for sending if connected
-    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+    if (!editingMessage && socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
       socketRef.current.send(JSON.stringify({ message: newMessage }));
       setNewMessage('');
       setIsSending(false);
       return;
     }
 
-    // Fallback to HTTP POST if WS fails or is not connected
+    // Fallback to HTTP POST if WS fails or is not connected OR if editing
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/chat/rooms/${selectedChat.id}/messages/`, {
-        method: 'POST',
+      let url = `${import.meta.env.VITE_API_URL}/api/chat/rooms/${selectedChat.id}/messages/`;
+      let method = 'POST';
+
+      if (editingMessage) {
+        url = `${import.meta.env.VITE_API_URL}/api/chat/messages/${editingMessage.id}/`;
+        method = 'PATCH';
+      }
+
+      const response = await fetch(url, {
+        method: method,
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ content: newMessage })
+        body: JSON.stringify({
+          content: newMessage,
+          reply_to: replyingTo?.id
+        })
       });
 
       if (response.ok) {
         const data = await response.json();
-        // Append message locally immediately
-        setMessages((prev) => [...prev, data]);
+
+        if (editingMessage) {
+          setMessages(prev => prev.map(m => m.id === editingMessage.id ? data : m));
+          setEditingMessage(null);
+        } else {
+          // Append message locally immediately
+          setMessages((prev) => [...prev, data]);
+        }
+
         setNewMessage('');
+        setReplyingTo(null);
 
         // Update conversation last message
         setConversations(prev => prev.map(c => {
@@ -321,7 +396,7 @@ export default function Messages() {
                       )}
                     >
                       <Avatar className="w-10 h-10 border border-border">
-                        <AvatarImage src={otherUser?.avatar || undefined} />
+                        <AvatarImage src={otherUser?.avatar || undefined} className="object-cover" />
                         <AvatarFallback>{otherUser?.first_name?.[0]}</AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
@@ -370,12 +445,14 @@ export default function Messages() {
                   <ArrowLeft className="w-5 h-5" />
                 </Button>
                 <Avatar className="w-8 h-8 md:w-10 md:h-10 border border-border">
-                  <AvatarImage src={getOtherUser(selectedChat)?.avatar || undefined} />
+                  <AvatarImage src={getOtherUser(selectedChat)?.avatar || undefined} className="object-cover" />
                   <AvatarFallback>{getOtherUser(selectedChat)?.first_name?.[0]}</AvatarFallback>
                 </Avatar>
                 <div>
                   <h2 className="font-semibold">{getOtherUser(selectedChat)?.first_name} {getOtherUser(selectedChat)?.last_name}</h2>
-                  <p className="text-xs text-muted-foreground">{selectedChat.property?.title}</p>
+                  <Badge variant="outline" className="text-xs font-normal mt-0.5 border-primary/20 bg-primary/5 text-primary">
+                    {selectedChat.property?.title}
+                  </Badge>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -400,19 +477,72 @@ export default function Messages() {
                     <div
                       key={message.id}
                       className={cn(
-                        "flex w-max max-w-[75%] flex-col gap-2 rounded-2xl px-4 py-3 text-sm shadow-sm",
-                        isOwn
-                          ? "ml-auto bg-primary text-primary-foreground rounded-br-none"
-                          : "bg-muted rounded-bl-none"
+                        "flex w-full gap-2 mb-2 group items-end",
+                        isOwn ? "justify-end" : "justify-start"
                       )}
                     >
-                      {message.content}
-                      <div className={cn("flex items-center gap-1 justify-end text-[10px] opacity-70", isOwn ? "text-primary-foreground" : "text-muted-foreground")}>
-                        <span>{format(new Date(message.timestamp), 'h:mm a')}</span>
-                        {isOwn && (
-                          message.is_read ? <CheckCheck className="w-3 h-3" /> : <Check className="w-3 h-3" />
+                      {/* Sender Actions (Edit/Delete) - Left Side */}
+                      {isOwn && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity rounded-full mb-1">
+                              <MoreVertical className="w-4 h-4 text-muted-foreground" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleEditMessage(message)}>
+                              <Edit className="w-3 h-3 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => handleDeleteMessage(message.id)}>
+                              <Trash2 className="w-3 h-3 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+
+                      <div
+                        onDoubleClick={() => setReplyingTo(message)}
+                        className={cn(
+                          "flex flex-col max-w-[75%] rounded-2xl px-4 py-2 text-sm shadow-sm cursor-pointer select-none",
+                          isOwn
+                            ? "bg-primary text-primary-foreground rounded-br-none"
+                            : "bg-muted rounded-bl-none"
                         )}
+                      >
+                        {/* Reply Context */}
+                        {message.reply_to_info && (
+                          <div className={cn("mb-1 border-l-2 pl-2 text-xs opacity-80 py-1 rounded bg-black/5", isOwn ? "border-primary-foreground/50" : "border-primary/50")}>
+                            <p className="font-bold">{message.reply_to_info.sender_name}</p>
+                            <p className="truncate opacity-90">{message.reply_to_info.content}</p>
+                          </div>
+                        )}
+
+                        {/* Content */}
+                        <div className="flex gap-2 flex-wrap items-end group/bubble">
+                          <span className="break-words leading-relaxed">{message.content}</span>
+                          <div className={cn("flex items-center gap-1 justify-end text-[10px] opacity-70 ml-auto leading-none mb-0.5", isOwn ? "text-primary-foreground" : "text-muted-foreground")}>
+                            <span>{format(new Date(message.timestamp), 'h:mm a')}</span>
+                            {isOwn && (
+                              message.is_read ? <CheckCheck className="w-3 h-3" /> : <Check className="w-3 h-3" />
+                            )}
+                          </div>
+                        </div>
                       </div>
+
+                      {/* Receiver Actions (Reply) - Right Side */}
+                      {!isOwn && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity rounded-full mb-1"
+                          onClick={() => setReplyingTo(message)}
+                          title="Reply"
+                        >
+                          <Reply className="w-4 h-4 text-muted-foreground" />
+                        </Button>
+                      )}
                     </div>
                   );
                 })}
@@ -421,19 +551,41 @@ export default function Messages() {
             </ScrollArea>
 
             {/* Input */}
-            <div className="p-4 border-t border-border bg-background">
-              <form onSubmit={handleSendMessage} className="max-w-3xl mx-auto flex gap-2">
-                <Input
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  placeholder="Type a message..."
-                  className="flex-1 rounded-full bg-muted/50 border-0 focus-visible:ring-1"
-                  disabled={isSending}
-                />
-                <Button type="submit" size="icon" className="rounded-full shrink-0" disabled={isSending || !newMessage.trim()}>
-                  {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                </Button>
-              </form>
+            <div className="bg-background border-t border-border">
+              {replyingTo && (
+                <div className="px-4 py-2 bg-muted/30 flex items-center justify-between text-sm mx-2 mt-2 rounded-lg border border-border">
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    <Reply className="w-4 h-4 text-primary shrink-0" />
+                    <div className="flex flex-col overflow-hidden">
+                      <span className="font-semibold text-primary text-xs">Replying to {replyingTo.sender_name}</span>
+                      <span className="truncate text-muted-foreground text-xs">{replyingTo.content}</span>
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-muted/50" onClick={() => setReplyingTo(null)}>
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              )}
+              <div className="p-4">
+                <form onSubmit={handleSendMessage} className="max-w-3xl mx-auto flex gap-2">
+                  <Input
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    placeholder={editingMessage ? "Edit your message..." : "Type a message..."}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape' && editingMessage) {
+                        setNewMessage('');
+                        setEditingMessage(null);
+                      }
+                    }}
+                    className="flex-1 rounded-full bg-muted/50 border-0 focus-visible:ring-1"
+                    disabled={isSending}
+                  />
+                  <Button type="submit" size="icon" className="rounded-full shrink-0" disabled={isSending || !newMessage.trim()}>
+                    {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  </Button>
+                </form>
+              </div>
             </div>
           </div>
         ) : (
@@ -444,8 +596,9 @@ export default function Messages() {
             <p className="text-lg font-medium">Select a conversation</p>
             <p className="text-sm">Choose a chat from the left to start messaging</p>
           </div>
-        )}
-      </div>
-    </div>
+        )
+        }
+      </div >
+    </div >
   );
 }

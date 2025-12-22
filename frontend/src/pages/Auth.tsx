@@ -68,7 +68,18 @@ const Auth = () => {
 
           // Redirect based on role or previous location
           const from = location.state?.from?.pathname;
-          const redirectTo = from || data.redirect_to || (data.user.role === "LANDLORD" ? "/landlord" : "/listings");
+          // Normalize role check (handle case sensitivity)
+          const userRole = data.user.role?.toUpperCase();
+
+          let redirectTo = from;
+          if (!redirectTo) {
+            if (userRole === "LANDLORD") {
+              redirectTo = "/landlord";
+            } else {
+              redirectTo = "/listings"; // Default for tenants
+            }
+          }
+
           navigate(redirectTo, { replace: true });
         } else {
           toast({

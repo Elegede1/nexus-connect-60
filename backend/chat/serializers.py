@@ -8,14 +8,24 @@ class MessageSerializer(serializers.ModelSerializer):
     """Serializer for chat messages"""
     
     sender_name = serializers.SerializerMethodField()
+    reply_to_info = serializers.SerializerMethodField()
     
     class Meta:
         model = Message
-        fields = ['id', 'sender', 'sender_name', 'content', 'is_read', 'timestamp']
-        read_only_fields = ['id', 'sender', 'timestamp']
+        fields = ['id', 'sender', 'sender_name', 'content', 'is_read', 'timestamp', 'reply_to', 'reply_to_info']
+        read_only_fields = ['id', 'sender', 'timestamp', 'reply_to_info']
     
     def get_sender_name(self, obj):
         return f"{obj.sender.first_name} {obj.sender.last_name}".strip() or obj.sender.username
+
+    def get_reply_to_info(self, obj):
+        if obj.reply_to:
+            return {
+                'id': obj.reply_to.id,
+                'sender_name': f"{obj.reply_to.sender.first_name} {obj.reply_to.sender.last_name}".strip() or obj.reply_to.sender.username,
+                'content': obj.reply_to.content
+            }
+        return None
 
 
 class ChatRoomSerializer(serializers.ModelSerializer):
