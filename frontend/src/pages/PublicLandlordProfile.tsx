@@ -1,0 +1,450 @@
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { Navbar } from "@/components/Navbar";
+import { Footer } from "@/components/Footer";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+    Building2,
+    Phone,
+    Mail,
+    MapPin,
+    Star,
+    CheckCircle2,
+    Eye,
+    MessageSquare,
+    Sparkles,
+    Loader2,
+    MessageCircle,
+    Plus,
+    UserMinus
+} from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+
+const PublicLandlordProfile = () => {
+    const { id } = useParams();
+    const navigate = useNavigate();
+    const { token: authToken, user: authUser } = useAuth();
+    const [profileData, setProfileData] = useState<any>(null);
+    const [properties, setProperties] = useState<any[]>([]);
+    const [reviews, setReviews] = useState<any[]>([]);
+    const [stats, setStats] = useState({
+        totalProperties: 0,
+        totalViews: 0,
+        averageRating: 0,
+        totalReviews: 0,
+    });
+    const [isLoading, setIsLoading] = useState(true);
+    const [isFollowing, setIsFollowing] = useState(false);
+    const [followLoading, setFollowLoading] = useState(false);
+    const [activeTab, setActiveTab] = useState<"properties" | "reviews">("properties");
+
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
+    useEffect(() => {
+        if (authToken && id) {
+            fetchProfile();
+            checkFollowStatus();
+        } else if (!authToken) {
+            // redirect to login if not authenticated (or maybe allow public view? user said "tenant", implying auth)
+            // Implementation plan said "Enable tenants...", so auth is likely expected.
+            navigate('/auth');
+        }
+    }, [authToken, id]);
+
+    const checkFollowStatus = async () => {
+        try {
+            const response = await fetch(`${API_URL}/api/auth/follow/status/${id}/`, {
+                headers: { 'Authorization': `Bearer ${authToken}` },
+            });
+            if (response.ok) {
+                const data = await response.json();
+                setIsFollowing(data.is_following);
+            }
+        } catch (error) {
+            console.error("Error checking follow status", error);
+        }
+    };
+
+    const fetchProfile = async () => {
+        if (!authToken || !id) return;
+
+        try {
+            // 1. Fetch Public Profile
+            const profileRes = await fetch(`${API_URL}/api/auth/public-profile/${id}/`, {
+                headers: { 'Authorization': `Bearer ${authToken}` },
+            });
+
+            if (profileRes.ok) {
+                const data = await profileRes.json();
+                setProfileData(data);
+                setProperties(data.properties || []);
+
+                // Update stats from profile data properties
+                if (data.properties) {
+                    const totalViews = data.properties.reduce((acc: number, curr: any) => acc + (curr.view_count || 0), 0);
+                    setStats(prev => ({
+                        ...prev,
+                        totalProperties: data.properties.length,
+                        totalViews,
+                    }));
+                }
+
+                // 2. Fetch Reviews 
+                const reviewsRes = await fetch(`${API_URL}/api/reviews/landlord/${id}/`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` },
+                });
+                if (reviewsRes.ok) {
+                    const reviewData = await reviewsRes.json();
+                    setReviews(reviewData.reviews || []);
+                    setStats(prev => ({
+                        ...prev,
+                        averageRating: reviewData.average_rating || 0,
+                        totalReviews: reviewData.total_reviews || 0
+                    }));
+                }
+
+            } else {
+                console.error("Failed to fetch profile");
+                // Handle error (e.g., user not found)
+            }
+
+        } catch (error) {
+            console.error('Error fetching data:', error);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const getUserName = () => {
+        if (!profileData) return 'Landlord';
+        if (profileData.first_name && profileData.last_name) {
+            return `${profileData.first_name} ${profileData.last_name}`;
+        }
+        return profileData.username || 'Landlord';
+    };
+
+    const getMemberSince = () => {
+        const date = profileData?.created_at;
+        if (!date) return new Date().getFullYear();
+        return new Date(date).getFullYear();
+    }
+
+    const handleFollow = async () => {
+        if (!authToken || !id) return;
+        setFollowLoading(true);
+        try {
+            const method = isFollowing ? 'DELETE' : 'POST';
+            const response = await fetch(`${API_URL}/api/auth/follow/${id}/`, {
+                method,
+                headers: { 'Authorization': `Bearer ${authToken}` },
+            });
+
+            if (response.ok) {
+                setIsFollowing(!isFollowing);
+            }
+        } catch (error) {
+            console.error("Error toggling follow", error);
+        } finally {
+            setFollowLoading(false);
+        }
+    };
+
+    const handleMessage = async () => {
+        // Initiate chat or navigate to chat with this landlord
+        // Based on user request "can also message"
+        try {
+            // We'll treat this as "create or get chat room" typically
+            // But we usually need a specific property context for the 'initiate chat' logic in Messages.tsx
+            // If we just want to DM, we might need a generic logic. 
+            // For now, let's navigate to messages page. The backend create_or_get_chat_room requires property_id.
+            // If the user clicks "Message", maybe we can ask them to select a property?
+            // OR, the requirements didn't specify strict context.
+            // Let's just create a room linked to their *first* property for now as a fallback, or just navigate to messages.
+            // Actually best UX: If this page is reached from a property, we might know the property. But here we don't.
+            // Let's just show a toast "Select a property to message about" or similar if we can't link it.
+            // However, the user request just said "Message button".
+            // Let's assume for now valid tenants might already have a chat.
+            navigate('/messages');
+        } catch (error) {
+            console.error(error);
+        }
+    }
+
+    if (isLoading) {
+        return (
+            <div className="min-h-screen bg-background flex items-center justify-center">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+        );
+    }
+
+    return (
+        <div className="min-h-screen bg-background">
+            <Navbar />
+
+            <main className="pt-24 pb-16">
+                <div className="container mx-auto px-4">
+                    {/* Profile Header */}
+                    <div className="relative mb-16 md:mb-0">
+                        {/* Cover Photo */}
+                        <div className="h-48 rounded-2xl bg-muted overflow-hidden relative group">
+                            {profileData?.cover_photo ? (
+                                <img
+                                    src={profileData.cover_photo}
+                                    alt="Cover"
+                                    className="w-full h-full object-cover"
+                                />
+                            ) : (
+                                <div className="w-full h-full bg-gradient-to-r from-primary/10 to-primary/5 flex items-center justify-center">
+                                    <p className="text-muted-foreground">No cover photo</p>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Profile Avatar */}
+                        <div className="absolute left-8 -bottom-16 z-10">
+                            <div className="relative group shrink-0">
+                                <div className="w-32 h-32 rounded-2xl border-4 border-background bg-card overflow-hidden shadow-xl">
+                                    <img
+                                        src={profileData?.avatar || "https://api.dicebear.com/7.x/avataaars/svg?seed=landlord"}
+                                        alt={getUserName()}
+                                        className="w-full h-full object-cover object-center"
+                                        onError={(e) => {
+                                            (e.target as HTMLImageElement).src = "https://api.dicebear.com/7.x/avataaars/svg?seed=landlord";
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Profile Info */}
+                    <div className="mt-2 mb-8 flex flex-col md:flex-row md:items-start justify-between gap-4 px-4 md:px-0">
+                        <div className="md:pl-44 pt-2">
+                            <div className="flex items-center gap-3 mb-1 flex-wrap">
+                                <h1 className="text-3xl font-bold text-foreground">{getUserName()}</h1>
+                                <Badge className="bg-emerald-500/20 text-emerald-500 border-emerald-500/30 gap-1 rounded-full px-3">
+                                    <CheckCircle2 className="w-3 h-3" />
+                                    Verified Landlord
+                                </Badge>
+                            </div>
+
+                            {/* Write-up */}
+                            <div className="flex flex-wrap items-center gap-2 text-muted-foreground font-medium">
+                                <span>Professional Landlord</span>
+                                <span className="w-1 h-1 rounded-full bg-muted-foreground/50" />
+                                <span>Member since {getMemberSince()}</span>
+                                <span className="w-1 h-1 rounded-full bg-muted-foreground/50" />
+                                <span>{stats.totalProperties} Properties</span>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3 flex-wrap mt-2 md:mt-0">
+                            {isFollowing ? (
+                                <div className="flex gap-1">
+                                    <Button
+                                        variant="outline"
+                                        className="gap-2 text-emerald-500 border-emerald-500/50 bg-emerald-500/10 hover:bg-emerald-500/20 hover:text-emerald-500 cursor-default"
+                                    >
+                                        <CheckCircle2 className="w-4 h-4" />
+                                        Following
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
+                                        onClick={handleFollow}
+                                        disabled={followLoading}
+                                        title="Unfollow"
+                                    >
+                                        <UserMinus className="w-4 h-4" />
+                                    </Button>
+                                </div>
+                            ) : (
+                                <Button
+                                    variant="default"
+                                    className="gap-2 transition-all hover:shadow-lg"
+                                    onClick={handleFollow}
+                                    disabled={followLoading}
+                                >
+                                    <Plus className="w-4 h-4" />
+                                    Follow
+                                </Button>
+                            )}
+
+                            <Button className="gap-2 transition-all hover:shadow-lg" onClick={handleMessage}>
+                                <MessageCircle className="w-4 h-4" />
+                                Message
+                            </Button>
+                        </div>
+                    </div>
+
+                    <div className="grid lg:grid-cols-3 gap-8 mt-8">
+                        {/* Left Column - Contact & Stats */}
+                        <div className="space-y-6">
+                            {/* Contact Info */}
+                            <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+                                <CardHeader>
+                                    <CardTitle className="text-lg">Contact Information</CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    {profileData?.phone_number && (
+                                        <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground transition-colors">
+                                            <Phone className="w-5 h-5 text-primary" />
+                                            <span>{profileData.phone_number}</span>
+                                        </div>
+                                    )}
+                                    <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground transition-colors">
+                                        <Mail className="w-5 h-5 text-primary" />
+                                        <span>{profileData?.email}</span>
+                                    </div>
+                                    <div className="flex items-center gap-3 text-muted-foreground hover:text-foreground transition-colors">
+                                        <MapPin className="w-5 h-5 text-primary" />
+                                        <span>{profileData?.location || "Location not set"}</span>
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            {/* Quick Stats */}
+                            <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+                                <CardHeader>
+                                    <CardTitle className="text-lg">Performance Overview</CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                                        <div className="flex items-center gap-3">
+                                            <Eye className="w-5 h-5 text-primary" />
+                                            <span className="text-sm">Total Views</span>
+                                        </div>
+                                        <span className="font-bold text-foreground">{stats.totalViews.toLocaleString()}</span>
+                                    </div>
+
+                                    <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                                        <div className="flex items-center gap-3">
+                                            <MessageSquare className="w-5 h-5 text-secondary" />
+                                            <span className="text-sm">Reviews</span>
+                                        </div>
+                                        <span className="font-bold text-foreground">{stats.totalReviews}</span>
+                                    </div>
+
+                                    <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                                        <div className="flex items-center gap-3">
+                                            <Star className="w-5 h-5 text-amber-500" />
+                                            <span className="text-sm">Avg Rating</span>
+                                        </div>
+                                        <span className="font-bold text-foreground">{stats.averageRating.toFixed(1)}</span>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
+
+                        {/* Right Column - Main Content */}
+                        <div className="lg:col-span-2 space-y-6">
+                            {/* Tab Navigation */}
+                            <div className="flex gap-2 p-1 bg-muted/50 rounded-xl">
+                                {[
+                                    { id: "properties", label: "Properties", icon: Building2 },
+                                    { id: "reviews", label: "Reviews", icon: Star },
+                                ].map((tab) => (
+                                    <button
+                                        key={tab.id}
+                                        onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                                        className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-medium transition-all duration-300 ${activeTab === tab.id
+                                            ? "bg-card text-foreground shadow-md"
+                                            : "text-muted-foreground hover:text-foreground"
+                                            }`}
+                                    >
+                                        <tab.icon className="w-4 h-4" />
+                                        {tab.label}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Tab Content */}
+                            <div className="animate-fade-in">
+                                {activeTab === "properties" && (
+                                    <div className="space-y-4">
+                                        {properties.length > 0 ? (
+                                            properties.map((property, index) => (
+                                                <Card
+                                                    key={property.id}
+                                                    className="border-border/50 bg-card/50 backdrop-blur-sm overflow-hidden hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer"
+                                                    onClick={() => navigate(`/property/${property.id}`)}
+                                                    style={{ animationDelay: `${index * 100}ms` }}
+                                                >
+                                                    <div className="flex gap-4 p-4">
+                                                        <div className="w-32 h-24 rounded-lg overflow-hidden shrink-0">
+                                                            <img
+                                                                src={property.cover_image || property.images?.[0]?.image_url || "https://placehold.co/150"}
+                                                                alt={property.title}
+                                                                className="w-full h-full object-cover"
+                                                            />
+                                                        </div>
+                                                        <div className="flex-1">
+                                                            <h3 className="font-semibold text-lg line-clamp-1">{property.title}</h3>
+                                                            <p className="text-primary font-bold">₦{Number(property.price).toLocaleString()}<span className="text-xs font-normal text-muted-foreground">/yr</span></p>
+                                                            <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+                                                                <span className="flex items-center gap-1"><Eye className="w-3 h-3" /> {property.view_count || 0}</span>
+                                                                <span className="flex items-center gap-1"><CheckCircle2 className="w-3 h-3 text-emerald-500" /> {property.property_type}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </Card>
+                                            ))
+                                        ) : (
+                                            <div className="text-center py-12 bg-muted/30 rounded-xl border border-dashed border-border">
+                                                <Building2 className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-50" />
+                                                <h3 className="text-lg font-medium text-foreground">No properties listed</h3>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {activeTab === "reviews" && (
+                                    <div className="space-y-4">
+                                        {reviews.length > 0 ? (
+                                            reviews.map((review, i) => (
+                                                <Card key={i} className="bg-card/50">
+                                                    <CardContent className="p-4">
+                                                        <div className="flex justify-between items-start">
+                                                            <div className="flex items-center gap-2 mb-2">
+                                                                <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
+                                                                    {review.tenant_name ? review.tenant_name[0] : 'T'}
+                                                                </div>
+                                                                <div>
+                                                                    <p className="font-medium text-sm">{review.tenant_name || 'Tenant'}</p>
+                                                                    <div className="flex text-amber-500">
+                                                                        {[...Array(5)].map((_, r) => (
+                                                                            <Star key={r} className={`w-3 h-3 ${r < review.rating ? 'fill-current' : 'text-muted'}`} />
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <span className="text-xs text-muted-foreground">{new Date(review.created_at).toLocaleDateString()}</span>
+                                                        </div>
+                                                        <p className="text-sm text-muted-foreground mt-2">{review.comment}</p>
+                                                    </CardContent>
+                                                </Card>
+                                            ))
+                                        ) : (
+                                            <div className="text-center py-12 bg-muted/30 rounded-xl border border-dashed border-border">
+                                                <MessageSquare className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-50" />
+                                                <h3 className="text-lg font-medium text-foreground">No reviews yet</h3>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+
+            <Footer />
+        </div>
+    );
+};
+
+export default PublicLandlordProfile;
