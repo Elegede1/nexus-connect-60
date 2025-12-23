@@ -51,12 +51,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
         try:
             data = json.loads(text_data)
             message_content = data.get('message', '').strip()
+            reply_to_id = data.get('reply_to')
+            property_id = data.get('property')
             
             if not message_content:
                 return
             
             # Save message to database
-            message = await self.save_message(message_content)
+            message = await self.save_message(message_content, reply_to_id, property_id)
             
             if message:
                 # Broadcast message to room group
@@ -64,15 +66,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     self.room_group_name,
                     {
                         'type': 'chat_message',
-                        'message': {
-                            'id': message['id'],
-                            'content': message['content'],
-                            'sender_id': message['sender_id'],
-                            'sender_email': message['sender_email'],
-                            'sender_name': message['sender_name'],
-                            'timestamp': message['timestamp'],
-                            'is_read': message['is_read']
-                        }
+                        'message': message
                     }
                 )
         except json.JSONDecodeError:
@@ -98,27 +92,68 @@ class ChatConsumer(AsyncWebsocketConsumer):
             return False
     
     @database_sync_to_async
-    def save_message(self, content):
+    def save_message(self, content, reply_to_id=None, property_id=None):
         """Save message to database"""
         try:
             room = ChatRoom.objects.get(pk=self.room_id)
+            
+            reply_to_message = None
+            if reply_to_id:
+                try:
+                    reply_to_message = Message.objects.get(pk=reply_to_id, room=room)
+                except Message.DoesNotExist:
+                    pass
+            
+            property_obj = None
+            if property_id:
+                from properties.models import Property
+                try:
+                    property_obj = Property.objects.get(pk=property_id)
+                except Property.DoesNotExist:
+                    pass
+
             message = Message.objects.create(
                 room=room,
                 sender=self.user,
-                content=content
+                content=content,
+                reply_to=reply_to_message,
+                property=property_obj
             )
             
             # Update room's updated_at
             room.save()
             
-            return {
+            response = {
                 'id': message.id,
                 'content': message.content,
+                'sender': message.sender.id, # consistent with serializer
                 'sender_id': message.sender.id,
                 'sender_email': message.sender.email,
                 'sender_name': f"{message.sender.first_name} {message.sender.last_name}".strip() or message.sender.username,
                 'timestamp': message.timestamp.isoformat(),
-                'is_read': message.is_read
+                'is_read': message.is_read,
+                'reply_to': message.reply_to.id if message.reply_to else None,
+                'reply_to_info': None,
+                'property': message.property.id if message.property else None,
+                'property_details': None
             }
+
+            if message.reply_to:
+                response['reply_to_info'] = {
+                    'id': message.reply_to.id,
+                    'sender_name': f"{message.reply_to.sender.first_name} {message.reply_to.sender.last_name}".strip() or message.reply_to.sender.username,
+                    'content': message.reply_to.content
+                }
+            
+            if message.property:
+                response['property_details'] = {
+                    'id': message.property.id,
+                    'title': message.property.title,
+                    'cover_image': message.property.cover_image.url if message.property.cover_image else None
+                }
+            
+            return response
+        except ChatRoom.DoesNotExist:
+            return None
         except ChatRoom.DoesNotExist:
             return None

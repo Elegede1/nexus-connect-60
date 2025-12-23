@@ -23,7 +23,7 @@ const Auth = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { login } = useAuth();
-  const [isLogin, setIsLogin] = useState(true);
+  const [isLogin, setIsLogin] = useState(location.state?.isLogin !== false);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({

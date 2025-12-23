@@ -37,6 +37,7 @@ import {
   Heart,
   CheckCircle2,
   Loader2,
+  X,
   Edit,
   Share2,
 } from "lucide-react";
@@ -68,10 +69,9 @@ const AMENITY_ICONS: Record<string, any> = {
   "Air Conditioning": Wind,
   "Cable TV": Tv,
   "Kitchen": Utensils,
-  // Add defaults for others
 };
 
-const PropertyDetail = () => {
+export default function PropertyDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -152,7 +152,13 @@ const PropertyDetail = () => {
         const data = await response.json();
         const room = data.room;
         toast({ title: "Chat room ready", description: "Redirecting to messages..." });
-        navigate('/messages', { state: { selectedRoomId: room.id, room: room } });
+        navigate('/messages', {
+          state: {
+            selectedRoomId: room.id,
+            room: room,
+            propertyId: property.id
+          }
+        });
       } else {
         const data = await response.json();
         throw new Error(data.error || "Failed to start conversation");
@@ -165,7 +171,7 @@ const PropertyDetail = () => {
   };
 
   const handleSaveProperty = async () => {
-    if (!user) return navigate('/auth', { state: { from: location } });
+    if (!user) return navigate('/auth', { state: { from: location, isLogin: false } });
     // Optimistic update
     setIsSaved(!isSaved);
     try {
@@ -273,24 +279,28 @@ const PropertyDetail = () => {
           {/* Media Carousel */}
           <div className="relative h-[60vh] rounded-2xl overflow-hidden mb-8 group bg-black">
             <div className="absolute inset-0">
-              {mediaItems.map((media, index: number) => (
-                // Only render current, previous, and next for performance
-                (Math.abs(index - currentImageIndex) <= 1 || (index === 0 && currentImageIndex === mediaItems.length - 1) || (index === mediaItems.length - 1 && currentImageIndex === 0)) && (
+              {mediaItems.map((media, index) => {
+                const isVisible = Math.abs(index - currentImageIndex) <= 1 ||
+                  (index === 0 && currentImageIndex === mediaItems.length - 1) ||
+                  (index === mediaItems.length - 1 && currentImageIndex === 0);
+
+                if (!isVisible) return null;
+
+                return (
                   <div
                     key={index}
                     className={cn(
                       "absolute inset-0 w-full h-full transition-all duration-700 ease-in-out cursor-pointer",
-                      index === currentImageIndex ? "opacity-100 z-10" : "opacity-0 z-0",
-                      // Slide effect could be added here
+                      index === currentImageIndex ? "opacity-100 z-10" : "opacity-0 z-0"
                     )}
-                    onClick={() => setIsDescriptionExpanded(true)} // Reusing state for lightbox for now, wait no, let's add new state
+                    onClick={() => setIsLightboxOpen(true)}
                   >
                     {media.type === 'video' ? (
                       <div className="w-full h-full flex items-center justify-center bg-black">
                         <video
                           src={media.url}
                           className="w-full h-full object-contain"
-                          muted // Mute in carousel preview
+                          muted
                           playsInline
                         />
                         <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/40 transition-colors">
@@ -311,20 +321,25 @@ const PropertyDetail = () => {
                       />
                     )}
                   </div>
-                )))}
+                );
+              })}
             </div>
 
             {/* Lightbox Dialog using existing Dialog component structure but maybe clearer to just use State */}
             <Dialog open={isLightboxOpen} onOpenChange={setIsLightboxOpen}>
-              <DialogContent className="max-w-[95vw] h-[90vh] p-0 bg-black/95 border-none">
+              <DialogContent
+                className="max-w-[95vw] h-[95vh] p-0 bg-black border-none"
+                onPointerDownOutside={(e) => e.preventDefault()}
+                onEscapeKeyDown={(e) => e.preventDefault()}
+              >
                 <div className="relative w-full h-full flex items-center justify-center">
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="absolute top-4 right-4 text-white/70 hover:text-white hover:bg-white/10 z-50 rounded-full"
+                    className="absolute top-4 right-4 text-white/90 hover:text-white hover:bg-white/20 z-[60] rounded-full w-12 h-12 bg-black/40 backdrop-blur-sm"
                     onClick={() => setIsLightboxOpen(false)}
                   >
-                    <Maximize className="w-6 h-6" />
+                    <X className="w-8 h-8" />
                     <span className="sr-only">Close</span>
                   </Button>
 
@@ -789,6 +804,4 @@ const PropertyDetail = () => {
       </main >
     </div >
   );
-};
-
-export default PropertyDetail;
+}

@@ -6,11 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Upload, X, Plus, Car, Shield, Droplets, Wifi, Zap, Wind, Tv } from 'lucide-react';
+import { Loader2, Upload, X, Car, Shield, Droplets, Wifi, Zap, Wind, Tv } from 'lucide-react';
 import { NIGERIAN_STATES } from '@/constants/locations';
 import { useAuth } from '@/context/AuthContext';
 
@@ -40,8 +39,6 @@ export default function AddProperty() {
         num_bedrooms: '',
         num_bathrooms: '',
         num_toilets: '',
-        size: '', // In sqm
-        furnished: false,
         amenities: [] as string[],
     });
 
@@ -84,9 +81,6 @@ export default function AddProperty() {
         }
     };
 
-    const handleCheckboxChange = (checked: boolean) => {
-        setFormData(prev => ({ ...prev, furnished: checked }));
-    };
 
     const toggleAmenity = (amenityName: string) => {
         setFormData(prev => {
@@ -190,8 +184,6 @@ export default function AddProperty() {
             data.append('num_bathrooms', formData.num_bathrooms);
             data.append('num_toilets', formData.num_toilets || '0');
             data.append('is_premium', 'false');
-            if (formData.size) data.append('size', formData.size);
-            data.append('furnished', formData.furnished.toString());
 
             // Append amenities
             formData.amenities.forEach(amenity => {
@@ -348,32 +340,18 @@ export default function AddProperty() {
                                 <CardTitle>Property Details</CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-6">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="grid gap-2">
-                                        <Label>Property Type</Label>
-                                        <Select onValueChange={(value) => handleSelectChange('property_type', value)} value={formData.property_type}>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select Type" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {propertyTypes.map((type) => (
-                                                    <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <div className="grid gap-2">
-                                        <Label htmlFor="size">Size (sqm) - Optional</Label>
-                                        <Input
-                                            id="size"
-                                            name="size"
-                                            type="number"
-                                            value={formData.size}
-                                            onChange={handleInputChange}
-                                            placeholder="e.g. 120"
-                                            min="0"
-                                        />
-                                    </div>
+                                <div className="grid gap-2">
+                                    <Label>Property Type</Label>
+                                    <Select onValueChange={(value) => handleSelectChange('property_type', value)} value={formData.property_type}>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select Type" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {propertyTypes.map((type) => (
+                                                <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -415,15 +393,6 @@ export default function AddProperty() {
                                     </div>
                                 </div>
 
-                                <div className="flex items-center space-x-2">
-                                    <Checkbox
-                                        id="furnished"
-                                        checked={formData.furnished}
-                                        onCheckedChange={handleCheckboxChange}
-                                    />
-                                    <Label htmlFor="furnished">Furnished</Label>
-                                </div>
-
                                 <div className="grid gap-4">
                                     <Label>Amenities</Label>
                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -453,7 +422,12 @@ export default function AddProperty() {
                         {/* Media */}
                         <Card>
                             <CardHeader>
-                                <CardTitle>Property Media</CardTitle>
+                                <div className="flex items-center justify-between">
+                                    <CardTitle>Property Media</CardTitle>
+                                    <div className="bg-primary/10 text-primary text-[10px] px-2 py-1 rounded-full font-bold uppercase tracking-wider">
+                                        Tip: Landscape (horizontal) photos look best
+                                    </div>
+                                </div>
                             </CardHeader>
                             <CardContent className="space-y-6">
                                 {/* Images */}

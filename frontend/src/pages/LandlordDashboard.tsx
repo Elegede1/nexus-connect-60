@@ -269,7 +269,10 @@ export default function LandlordDashboard() {
               )}
 
               {/* Add Property Card */}
-              <Card className="border-dashed border-2 hover:border-primary/50 transition-colors cursor-pointer group">
+              <Card
+                className="border-dashed border-2 hover:border-primary/50 transition-colors cursor-pointer group"
+                onClick={() => navigate('/add-property')}
+              >
                 <CardContent className="p-8 flex flex-col items-center justify-center text-center">
                   <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                     <Plus className="w-8 h-8 text-primary" />

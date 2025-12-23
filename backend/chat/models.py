@@ -7,8 +7,8 @@ User = get_user_model()
 
 class ChatRoom(models.Model):
     """
-    Chat room between a landlord and tenant for a specific property.
-    One room per landlord-tenant-property combination.
+    Chat room between a landlord and tenant.
+    One room per landlord-tenant combination.
     """
     
     landlord = models.ForeignKey(
@@ -23,22 +23,25 @@ class ChatRoom(models.Model):
         related_name='tenant_chat_rooms',
         limit_choices_to={'role': 'TENANT'}
     )
+    # The property that initiated the chat (fallback/initial interest)
     property = models.ForeignKey(
         Property,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name='chat_rooms'
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
     class Meta:
-        unique_together = ['landlord', 'tenant', 'property']
+        unique_together = ['landlord', 'tenant']
         ordering = ['-updated_at']
         verbose_name = 'Chat Room'
         verbose_name_plural = 'Chat Rooms'
     
     def __str__(self):
-        return f"Chat: {self.tenant.email} - {self.landlord.email} ({self.property.title})"
+        return f"Chat: {self.tenant.email} - {self.landlord.email}"
     
     def get_unread_count(self, user):
         """Get unread message count for a specific user"""
@@ -60,6 +63,14 @@ class Message(models.Model):
         on_delete=models.CASCADE,
         related_name='sent_messages'
     )
+    # The property being discussed in this specific message
+    property = models.ForeignKey(
+        Property,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='property_messages'
+    )
     content = models.TextField()
     reply_to = models.ForeignKey(
         'self',
@@ -67,6 +78,11 @@ class Message(models.Model):
         null=True,
         blank=True,
         related_name='replies'
+    )
+    attachment = models.FileField(
+        upload_to='chat_attachments/',
+        null=True,
+        blank=True
     )
     is_read = models.BooleanField(default=False)
     timestamp = models.DateTimeField(auto_now_add=True)

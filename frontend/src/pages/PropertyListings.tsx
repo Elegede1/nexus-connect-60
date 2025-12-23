@@ -4,6 +4,7 @@ import { Footer } from '@/components/Footer';
 import { PropertyCard } from '@/components/PropertyCard';
 import { PropertyFilters } from '@/components/PropertyFilters';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/context/AuthContext';
 import { Grid3X3, LayoutList, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -14,6 +15,7 @@ export default function PropertyListings() {
   const [properties, setProperties] = useState<any[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
+  const { token } = useAuth();
   const propertiesPerPage = 6;
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -47,7 +49,9 @@ export default function PropertyListings() {
         params.append('amenities', filters.furnished);
       }
 
-      const response = await fetch(`${API_URL}/api/properties/?${params.toString()}`);
+      const response = await fetch(`${API_URL}/api/properties/?${params.toString()}`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      });
       if (response.ok) {
         const data = await response.json();
         const results = Array.isArray(data) ? data : (data.results || []);
@@ -67,6 +71,7 @@ export default function PropertyListings() {
           type: p.property_type,
           isPremium: p.is_premium,
           isFurnished: p.amenities_list?.some((a: string) => a.toLowerCase().includes('furnished')),
+          isSaved: p.is_saved,
           rating: p.average_rating,
           reviewCount: p.review_count,
         }));

@@ -28,6 +28,7 @@ class PropertyListSerializer(serializers.ModelSerializer):
     landlord_name = serializers.SerializerMethodField()
     cover_image = serializers.SerializerMethodField()        
     amenities_list = serializers.SerializerMethodField()
+    is_saved = serializers.SerializerMethodField()
     review_count = serializers.SerializerMethodField()
     average_rating = serializers.SerializerMethodField()
     
@@ -37,8 +38,15 @@ class PropertyListSerializer(serializers.ModelSerializer):
             'id', 'title', 'price', 'location', 'state', 'city', 'property_type',
             'num_bedrooms', 'num_bathrooms', 'num_toilets', 'is_premium',
             'cover_image', 'landlord_name', 'amenities_list',
-            'view_count', 'save_count', 'review_count', 'average_rating', 'created_at'
+            'view_count', 'save_count', 'is_saved', 'review_count', 'average_rating', 'created_at'
         ]
+    
+    def get_is_saved(self, obj):
+        """Check if current user has saved this property"""
+        request = self.context.get('request')
+        if request and request.user.is_authenticated and request.user.is_tenant():
+            return obj.saved_by.filter(tenant=request.user).exists()
+        return False
     
     def get_landlord_name(self, obj):
         return f"{obj.landlord.first_name} {obj.landlord.last_name}".strip() or obj.landlord.username
@@ -55,12 +63,18 @@ class PropertyListSerializer(serializers.ModelSerializer):
         return obj.get_amenities_list()
 
     def get_review_count(self, obj):
-        return obj.reviews.count()
+        try:
+            return obj.reviews.count()
+        except Exception:
+            return 0
 
     def get_average_rating(self, obj):
-        from django.db.models import Avg
-        avg = obj.reviews.aggregate(Avg('rating'))['rating__avg']
-        return round(avg, 1) if avg else 0.0
+        try:
+            from django.db.models import Avg
+            avg = obj.reviews.aggregate(Avg('rating'))['rating__avg']
+            return round(avg, 1) if avg else 0.0
+        except Exception:
+            return 0.0
 
 
 class PropertyDetailSerializer(serializers.ModelSerializer):
@@ -100,12 +114,18 @@ class PropertyDetailSerializer(serializers.ModelSerializer):
         return False
 
     def get_review_count(self, obj):
-        return obj.reviews.count()
+        try:
+            return obj.reviews.count()
+        except Exception:
+            return 0
 
     def get_average_rating(self, obj):
-        from django.db.models import Avg
-        avg = obj.reviews.aggregate(Avg('rating'))['rating__avg']
-        return round(avg, 1) if avg else 0.0
+        try:
+            from django.db.models import Avg
+            avg = obj.reviews.aggregate(Avg('rating'))['rating__avg']
+            return round(avg, 1) if avg else 0.0
+        except Exception:
+            return 0.0
 
 
 class PropertyCreateUpdateSerializer(serializers.ModelSerializer):

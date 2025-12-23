@@ -4,6 +4,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 
 interface PropertyCardProps {
   id: string;
@@ -20,6 +21,7 @@ interface PropertyCardProps {
   rating?: number;
   reviewCount?: number;
   duration?: number;
+  isSaved?: boolean;
 }
 
 export function PropertyCard({
@@ -37,11 +39,14 @@ export function PropertyCard({
   rating = 0,
   reviewCount = 0,
   duration = 1,
+  isSaved = false,
 }: PropertyCardProps) {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
+  const { toast } = useToast();
   const navigate = useNavigate();
   const routerLocation = useLocation();
-  const [isLiked, setIsLiked] = useState(false);
+  const [isLiked, setIsLiked] = useState(isSaved);
+  const [isLiking, setIsLiking] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
 
   const formatPrice = (price: number) => {
@@ -90,13 +95,43 @@ export function PropertyCard({
 
         {/* Like Button */}
         <button
-          onClick={(e) => {
+          onClick={async (e) => {
             e.preventDefault(); // Prevent link navigation
             if (!user) {
-              navigate('/auth', { state: { from: routerLocation } });
+              navigate('/auth', { state: { from: routerLocation, isLogin: false } });
               return;
             }
-            setIsLiked(!isLiked);
+            if (isLiking) return;
+
+            // Optimistic update
+            const nextState = !isLiked;
+            setIsLiked(nextState);
+            setIsLiking(true);
+
+            try {
+              const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+              const method = nextState ? 'POST' : 'DELETE';
+              const response = await fetch(`${API_URL}/api/properties/${id}/save/`, {
+                method,
+                headers: {
+                  'Authorization': `Bearer ${token}`
+                }
+              });
+
+              if (!response.ok) {
+                throw new Error("Failed to update favorite status");
+              }
+            } catch (error) {
+              // Revert on error
+              setIsLiked(!nextState);
+              toast({
+                title: "Error",
+                description: "Could not update your favorites. Please try again.",
+                variant: "destructive"
+              });
+            } finally {
+              setIsLiking(false);
+            }
           }}
           className="absolute top-3 right-3 p-2 rounded-full bg-card/90 backdrop-blur-sm hover:bg-card transition-all duration-300 hover:scale-110 active:scale-95"
           aria-label={isLiked ? "Remove from favorites" : "Add to favorites"}

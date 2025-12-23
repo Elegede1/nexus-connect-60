@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Navbar } from '@/components/Navbar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,7 +10,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
   Loader2, Send, Search, MoreVertical, Phone, Video, Info, ArrowLeft, MessageSquare, Check, CheckCheck,
-  Edit, Trash2, Reply, X
+  Edit, Trash2, Reply, X, Paperclip, FileIcon, Image, PlaySquare
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -29,6 +29,7 @@ interface User {
   last_name: string;
   avatar: string | null;
   username: string;
+  role: string;
 }
 
 interface Message {
@@ -43,6 +44,13 @@ interface Message {
     id: number;
     sender_name: string;
     content: string;
+  };
+  attachment?: string;
+  property?: number;
+  property_details?: {
+    id: number;
+    title: string;
+    cover_image: string | null;
   };
 }
 
@@ -64,6 +72,7 @@ export default function Messages() {
   const { user, token } = useAuth();
   const { toast } = useToast();
   const location = useLocation();
+  const navigate = useNavigate();
   const [conversations, setConversations] = useState<ChatRoom[]>([]);
   const [selectedChat, setSelectedChat] = useState<ChatRoom | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -76,6 +85,9 @@ export default function Messages() {
   const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
   const [editingMessage, setEditingMessage] = useState<Message | null>(null);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [contextPropertyId, setContextPropertyId] = useState<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleEditMessage = (message: Message) => {
     setNewMessage(message.content);
@@ -109,17 +121,25 @@ export default function Messages() {
     return () => clearInterval(interval);
   }, [token]);
 
-  // Handle auto-selection from navigation state
+  // Handle conversation selection from location state
   useEffect(() => {
     if (location.state?.selectedRoomId) {
       const roomId = location.state.selectedRoomId;
-      // If we have the full room object, use it immediately
-      if (location.state.room) {
-        setSelectedChat(location.state.room);
+      const room = location.state.room;
+      if (room) {
+        setSelectedChat(room);
+        if (location.state.propertyId) {
+          setContextPropertyId(location.state.propertyId);
+        }
       } else {
-        // Otherwise find it in the list (might need to fetch if not loaded yet)
+        // If room object is not directly provided, try to find it in the current conversations
         const found = conversations.find(c => c.id === roomId);
-        if (found) setSelectedChat(found);
+        if (found) {
+          setSelectedChat(found);
+          if (location.state.propertyId) {
+            setContextPropertyId(location.state.propertyId);
+          }
+        }
       }
       // Clear state so it doesn't persist on refresh/navigation
       window.history.replaceState({}, document.title);
@@ -265,10 +285,16 @@ export default function Messages() {
     // OR: WebSocket send()?
     // Backend consumer has receive() method that creates message.
 
-    // Let's use WebSocket for sending if connected
-    if (!editingMessage && socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
-      socketRef.current.send(JSON.stringify({ message: newMessage }));
+    // Let's use WebSocket for sending if connected (only for text-only, non-edit messages)
+    if (!selectedFile && !editingMessage && socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+      socketRef.current.send(JSON.stringify({
+        message: newMessage,
+        reply_to: replyingTo?.id,
+        property: contextPropertyId
+      }));
       setNewMessage('');
+      setReplyingTo(null);
+      setContextPropertyId(null);
       setIsSending(false);
       return;
     }
@@ -283,16 +309,30 @@ export default function Messages() {
         method = 'PATCH';
       }
 
+      let body: any;
+      let headers: any = { 'Authorization': `Bearer ${token}` };
+
+      if (selectedFile) {
+        const formData = new FormData();
+        formData.append('content', newMessage);
+        formData.append('attachment', selectedFile);
+        if (replyingTo) formData.append('reply_to', replyingTo.id.toString());
+        if (contextPropertyId) formData.append('property', contextPropertyId.toString());
+        body = formData;
+        // Don't set Content-Type, browser will set it with boundary for FormData
+      } else {
+        body = JSON.stringify({
+          content: newMessage,
+          reply_to: replyingTo?.id,
+          property: contextPropertyId
+        });
+        headers['Content-Type'] = 'application/json';
+      }
+
       const response = await fetch(url, {
         method: method,
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          content: newMessage,
-          reply_to: replyingTo?.id
-        })
+        headers: headers,
+        body: body
       });
 
       if (response.ok) {
@@ -308,6 +348,8 @@ export default function Messages() {
 
         setNewMessage('');
         setReplyingTo(null);
+        setSelectedFile(null);
+        setContextPropertyId(null);
 
         // Update conversation last message
         setConversations(prev => prev.map(c => {
@@ -444,25 +486,39 @@ export default function Messages() {
                 >
                   <ArrowLeft className="w-5 h-5" />
                 </Button>
-                <Avatar className="w-8 h-8 md:w-10 md:h-10 border border-border">
-                  <AvatarImage src={getOtherUser(selectedChat)?.avatar || undefined} className="object-cover" />
-                  <AvatarFallback>{getOtherUser(selectedChat)?.first_name?.[0]}</AvatarFallback>
-                </Avatar>
-                <div>
-                  <h2 className="font-semibold">{getOtherUser(selectedChat)?.first_name} {getOtherUser(selectedChat)?.last_name}</h2>
-                  <Badge variant="outline" className="text-xs font-normal mt-0.5 border-primary/20 bg-primary/5 text-primary">
-                    {selectedChat.property?.title}
-                  </Badge>
+                <div
+                  className="flex items-center gap-3 cursor-pointer group/header"
+                  onClick={() => {
+                    const otherUser = getOtherUser(selectedChat);
+                    if (otherUser.role === 'LANDLORD') {
+                      navigate(`/landlord/${otherUser.id}`);
+                    } else {
+                      navigate(`/tenant-profile`); // Or similar for tenants
+                    }
+                  }}
+                >
+                  <Avatar className="w-8 h-8 md:w-10 md:h-10 border border-border group-hover/header:ring-2 group-hover/header:ring-primary/20 transition-all">
+                    <AvatarImage src={getOtherUser(selectedChat)?.avatar || undefined} className="object-cover" />
+                    <AvatarFallback>{getOtherUser(selectedChat)?.first_name?.[0]}</AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <h2 className="font-semibold group-hover/header:text-primary transition-colors">
+                      {getOtherUser(selectedChat)?.first_name} {getOtherUser(selectedChat)?.last_name}
+                    </h2>
+                    <Badge variant="outline" className="text-xs font-normal mt-0.5 border-primary/20 bg-primary/5 text-primary">
+                      {selectedChat.property?.title}
+                    </Badge>
+                  </div>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <Button variant="ghost" size="icon">
+                <Button variant="ghost" size="icon" title="Voice Call">
                   <Phone className="w-5 h-5 opacity-70" />
                 </Button>
-                <Button variant="ghost" size="icon">
+                <Button variant="ghost" size="icon" title="Video Call">
                   <Video className="w-5 h-5 opacity-70" />
                 </Button>
-                <Button variant="ghost" size="icon">
+                <Button variant="ghost" size="icon" title="View Info">
                   <Info className="w-5 h-5 opacity-70" />
                 </Button>
               </div>
@@ -485,7 +541,7 @@ export default function Messages() {
                       {isOwn && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity rounded-full mb-1">
+                            <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity rounded-full mb-1" title="Message Options">
                               <MoreVertical className="w-4 h-4 text-muted-foreground" />
                             </Button>
                           </DropdownMenuTrigger>
@@ -519,10 +575,75 @@ export default function Messages() {
                           </div>
                         )}
 
+                        {/* Property Context Highlight */}
+                        {message.property_details && (
+                          <div className={cn(
+                            "mb-2 p-2 rounded-lg border flex items-center gap-3 max-w-sm",
+                            isOwn ? "bg-white/10 border-white/20" : "bg-muted/50 border-border"
+                          )}>
+                            {message.property_details.cover_image && (
+                              <img
+                                src={message.property_details.cover_image}
+                                alt={message.property_details.title}
+                                className="w-10 h-10 rounded object-cover shrink-0"
+                              />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[10px] uppercase font-bold tracking-wider opacity-70">
+                                Discussing Property
+                              </p>
+                              <p className="text-xs font-medium truncate">
+                                {message.property_details.title}
+                              </p>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 rounded-full"
+                              onClick={() => navigate(`/property/${message.property_details?.id}`)}
+                            >
+                              <Info className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        )}
+
+                        {/* Attachment Rendering */}
+                        {message.attachment && (
+                          <div className="mb-2 max-w-full overflow-hidden rounded-lg">
+                            {message.attachment.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
+                              <img
+                                src={message.attachment}
+                                alt="attachment"
+                                className="max-h-60 object-contain cursor-pointer"
+                                onClick={() => window.open(message.attachment, '_blank')}
+                              />
+                            ) : message.attachment.match(/\.(mp4|webm|ogg)$/i) ? (
+                              <video controls className="max-h-60">
+                                <source src={message.attachment} />
+                              </video>
+                            ) : (
+                              <a
+                                href={message.attachment}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={cn(
+                                  "flex items-center gap-2 p-2 rounded-md hover:opacity-80 transition-opacity",
+                                  isOwn ? "bg-white/10" : "bg-black/5"
+                                )}
+                              >
+                                <FileIcon className="w-4 h-4 shrink-0" />
+                                <span className="text-xs truncate max-w-[150px]">
+                                  {message.attachment.split('/').pop()}
+                                </span>
+                              </a>
+                            )}
+                          </div>
+                        )}
+
                         {/* Content */}
-                        <div className="flex gap-2 flex-wrap items-end group/bubble">
+                        <div className="flex flex-col gap-1 group/bubble min-w-[120px]">
                           <span className="break-words leading-relaxed">{message.content}</span>
-                          <div className={cn("flex items-center gap-1 justify-end text-[10px] opacity-70 ml-auto leading-none mb-0.5", isOwn ? "text-primary-foreground" : "text-muted-foreground")}>
+                          <div className={cn("flex items-center gap-1 justify-end text-[10px] opacity-70 ml-auto leading-none", isOwn ? "text-primary-foreground" : "text-muted-foreground")}>
                             <span>{format(new Date(message.timestamp), 'h:mm a')}</span>
                             {isOwn && (
                               message.is_read ? <CheckCheck className="w-3 h-3" /> : <Check className="w-3 h-3" />
@@ -567,7 +688,34 @@ export default function Messages() {
                 </div>
               )}
               <div className="p-4">
-                <form onSubmit={handleSendMessage} className="max-w-3xl mx-auto flex gap-2">
+                {selectedFile && (
+                  <div className="mb-2 px-3 py-2 bg-muted/30 border border-border rounded-lg flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2 overflow-hidden">
+                      {selectedFile.type.startsWith('image/') ? <Image className="w-4 h-4 text-primary shrink-0" /> : <FileIcon className="w-4 h-4 text-primary shrink-0" />}
+                      <span className="truncate">{selectedFile.name}</span>
+                    </div>
+                    <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setSelectedFile(null)} title="Remove File">
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
+                <form onSubmit={handleSendMessage} className="max-w-3xl mx-auto flex gap-2 items-end">
+                  <input
+                    type="file"
+                    className="hidden"
+                    ref={fileInputRef}
+                    onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="rounded-full shrink-0 text-muted-foreground hover:text-primary"
+                    onClick={() => fileInputRef.current?.click()}
+                    title="Attach File"
+                  >
+                    <Paperclip className="w-5 h-5" />
+                  </Button>
                   <Input
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
@@ -581,7 +729,13 @@ export default function Messages() {
                     className="flex-1 rounded-full bg-muted/50 border-0 focus-visible:ring-1"
                     disabled={isSending}
                   />
-                  <Button type="submit" size="icon" className="rounded-full shrink-0" disabled={isSending || !newMessage.trim()}>
+                  <Button
+                    type="submit"
+                    size="icon"
+                    className="rounded-full shrink-0"
+                    disabled={isSending || !newMessage.trim()}
+                    title="Send Message"
+                  >
                     {isSending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                   </Button>
                 </form>

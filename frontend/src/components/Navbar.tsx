@@ -143,6 +143,29 @@ export function Navbar() {
   };
 
   const handleNotificationClick = async (notification: Notification) => {
+    // Mark as read in backend if not already read
+    if (!notification.is_read && token) {
+      try {
+        const response = await fetch(`${API_URL}/api/notifications/${notification.id}/read/`, {
+          method: 'PATCH',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.ok) {
+          // Update local state
+          setNotifications(prev => prev.map(n =>
+            n.id === notification.id ? { ...n, is_read: true } : n
+          ));
+          setUnreadNotifications(prev => Math.max(0, prev - 1));
+        }
+      } catch (error) {
+        console.error("Failed to mark notification as read", error);
+      }
+    }
+
     // Navigate
     if (notification.related_property_id) {
       navigate(`/property/${notification.related_property_id}`);

@@ -58,12 +58,18 @@ def create_or_get_chat_room(request):
             status=status.HTTP_403_FORBIDDEN
         )
     
-    # Get or create chat room
+    # Get or create chat room (consolidated per landlord-tenant)
     room, created = ChatRoom.objects.get_or_create(
         landlord=landlord,
-        tenant=tenant,
-        property=property_obj
+        tenant=tenant
     )
+    
+    # If it's a new room OR a different property is requested, 
+    # the frontend might want to send a "Discussing X" message.
+    # We ensure the room has this property as a fallback initial interest if not set.
+    if not room.property:
+        room.property = property_obj
+        room.save()
     
     return Response({
         'room': ChatRoomSerializer(room, context={'request': request}).data,

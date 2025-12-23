@@ -588,7 +588,12 @@ export default function EditProperty() {
                         {/* Media */}
                         <Card>
                             <CardHeader>
-                                <CardTitle>Property Media</CardTitle>
+                                <div className="flex items-center justify-between">
+                                    <CardTitle>Property Media</CardTitle>
+                                    <div className="bg-primary/10 text-primary text-[10px] px-2 py-1 rounded-full font-bold uppercase tracking-wider">
+                                        Tip: Landscape (horizontal) photos look best
+                                    </div>
+                                </div>
                             </CardHeader>
                             <CardContent className="space-y-6">
 
