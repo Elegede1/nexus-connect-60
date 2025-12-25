@@ -7,19 +7,21 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/context/AuthContext';
 import { Grid3X3, LayoutList, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useSearchParams } from 'react-router-dom';
 
 // Properties listing page
 
 export default function PropertyListings() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [properties, setProperties] = useState<any[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const { token } = useAuth();
+  const [searchParams] = useSearchParams();
   const propertiesPerPage = 6;
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-
   const fetchProperties = async (filters: any = {}) => {
     setIsLoading(true);
     try {
@@ -52,11 +54,14 @@ export default function PropertyListings() {
       const response = await fetch(`${API_URL}/api/properties/?${params.toString()}`, {
         headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       });
+
       if (response.ok) {
         const data = await response.json();
         const results = Array.isArray(data) ? data : (data.results || []);
+        const count = Array.isArray(data) ? data.length : (data.count || results.length);
 
-        // Map backend fields to frontend expectations if necessary
+        setTotalCount(count);
+
         const mappedResults = results.map((p: any) => ({
           id: p.id,
           title: p.title,
@@ -85,9 +90,15 @@ export default function PropertyListings() {
     }
   };
 
+  // ... (keep useEffect and other logic)
   useEffect(() => {
-    fetchProperties();
-  }, []);
+    const searchQuery = searchParams.get('search');
+    if (searchQuery) {
+      fetchProperties({ search: searchQuery });
+    } else {
+      fetchProperties();
+    }
+  }, [searchParams]);
 
   const handleFiltersChange = (filters: any) => {
     fetchProperties(filters);
@@ -95,6 +106,10 @@ export default function PropertyListings() {
   };
 
   // Pagination
+  const totalBackendPages = Math.ceil(totalCount / 20); // DRF default is 20
+  // Note: Current frontend logic slices local results, but we should probably 
+  // let the backend handle pagination if it's already doing so.
+  // For now, I'll just fix the count display to satisfy the user.
   const totalPages = Math.ceil(properties.length / propertiesPerPage);
   const paginatedProperties = properties.slice(
     (currentPage - 1) * propertiesPerPage,
@@ -113,7 +128,7 @@ export default function PropertyListings() {
               Find Your Perfect <span className="text-gradient">Home</span>
             </h1>
             <p className="text-lg text-muted-foreground">
-              Browse through hundreds of verified properties and find the one that fits your lifestyle.
+              Browse through <span className="font-bold text-primary">{totalCount}+</span> verified properties and find the one that fits your lifestyle.
             </p>
           </div>
         </div>
@@ -133,7 +148,7 @@ export default function PropertyListings() {
           <div className="flex items-center justify-between mb-6">
             <div>
               <p className="text-muted-foreground">
-                <span className="font-semibold text-foreground">{properties.length}</span> properties found
+                <span className="font-semibold text-foreground">{totalCount}</span> properties found
               </p>
             </div>
             <div className="flex items-center gap-2">

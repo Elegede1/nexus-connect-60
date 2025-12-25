@@ -51,7 +51,7 @@ const About = () => {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      
+
       {/* Hero Section */}
       <section className="pt-24 pb-16 px-4">
         <div className="container mx-auto max-w-4xl text-center">
@@ -59,7 +59,7 @@ const About = () => {
             About <span className="text-primary">HomeHive</span>
           </h1>
           <p className="text-xl text-muted-foreground animate-fade-in" style={{ animationDelay: "0.1s" }}>
-            Connecting Homes, Connecting People
+            Your Hive of Housing Harmony
           </p>
         </div>
       </section>
@@ -71,17 +71,17 @@ const About = () => {
             <div className="animate-fade-in" style={{ animationDelay: "0.2s" }}>
               <h2 className="text-3xl font-bold text-foreground mb-6">Our Story</h2>
               <p className="text-muted-foreground mb-4">
-                HomeHive was born from a simple frustration: finding a home shouldn't be complicated. 
-                In 2024, our founders experienced firsthand the challenges of navigating the rental 
+                HomeHive was born from a simple frustration: finding a home shouldn't be complicated.
+                In 2024, our founders experienced firsthand the challenges of navigating the rental
                 market—endless calls, unresponsive landlords, and hidden fees.
               </p>
               <p className="text-muted-foreground mb-4">
-                We believed there had to be a better way. So we built HomeHive—a platform that 
-                directly connects landlords with tenants, eliminating the middleman and creating 
+                We believed there had to be a better way. So we built HomeHive—a platform that
+                directly connects landlords with tenants, eliminating the middleman and creating
                 transparent, trustworthy rental experiences.
               </p>
               <p className="text-muted-foreground">
-                Today, HomeHive serves thousands of users, helping them find their perfect home 
+                Today, HomeHive serves thousands of users, helping them find their perfect home
                 or the ideal tenant, one connection at a time.
               </p>
             </div>
@@ -108,8 +108,8 @@ const About = () => {
         <div className="container mx-auto max-w-4xl text-center">
           <h2 className="text-3xl font-bold text-foreground mb-6 animate-fade-in">Our Mission</h2>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto animate-fade-in" style={{ animationDelay: "0.1s" }}>
-            To revolutionize the rental experience by creating a seamless, transparent, and 
-            trustworthy platform where landlords and tenants can connect directly, fostering 
+            To revolutionize the rental experience by creating a seamless, transparent, and
+            trustworthy platform where landlords and tenants can connect directly, fostering
             communities and turning houses into homes.
           </p>
         </div>
@@ -142,7 +142,7 @@ const About = () => {
         <div className="container mx-auto max-w-4xl text-center">
           <h2 className="text-3xl font-bold text-foreground mb-6">Join Our Journey</h2>
           <p className="text-muted-foreground mb-8">
-            Whether you're a landlord looking to reach quality tenants or a tenant searching 
+            Whether you're a landlord looking to reach quality tenants or a tenant searching
             for your next home, HomeHive is here to help.
           </p>
           <div className="flex flex-wrap gap-4 justify-center">

@@ -1,7 +1,8 @@
-import { ArrowRight, Shield, Clock, Handshake, Search } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { ArrowRight, Shield, Users, ThumbsUp, Search, Home } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
+import { useAuth } from '@/context/AuthContext';
 
 const CountUp = ({ end, suffix = "" }: { end: string | number, suffix?: string }) => {
   const [count, setCount] = useState(0);
@@ -31,10 +32,12 @@ const CountUp = ({ end, suffix = "" }: { end: string | number, suffix?: string }
 export function HeroSection() {
   const [searchQuery, setSearchQuery] = useState('');
   const [metrics, setMetrics] = useState({
-    verified_users: 0,
-    avg_match_time: "0h",
-    successful_matches: 0
+    active_listings: 0,
+    happy_users: 0,
+    satisfaction_rate: 0
   });
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -46,10 +49,18 @@ export function HeroSection() {
   }, [API_URL]);
 
   const stats = [
-    { icon: Shield, label: 'Verified Users', value: metrics.verified_users, suffix: "+" },
-    { icon: Clock, label: 'Avg. Match Time', value: metrics.avg_match_time },
-    { icon: Handshake, label: 'Successful Matches', value: metrics.successful_matches, suffix: "+" },
+    { icon: Home, label: 'Active Listings', value: metrics.active_listings, suffix: "+" },
+    { icon: Users, label: 'Happy Users', value: metrics.happy_users, suffix: "+" },
+    { icon: ThumbsUp, label: 'Satisfaction', value: metrics.satisfaction_rate, suffix: "%" },
   ];
+
+  const handleSearch = () => {
+    if (searchQuery.trim()) {
+      navigate(`/listings?search=${encodeURIComponent(searchQuery)}`);
+    } else {
+      navigate('/listings');
+    }
+  };
 
   return (
     <section id="home" className="relative min-h-screen flex items-center pt-16 overflow-hidden">
@@ -63,10 +74,15 @@ export function HeroSection() {
 
       <div className="container mx-auto px-4 relative z-10">
         <div className="max-w-4xl mx-auto text-center">
-          {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-card border border-border shadow-md mb-8 animate-fade-up">
-            <span className="w-2 h-2 rounded-full bg-emerald animate-pulse" />
-            <span className="text-sm font-medium text-muted-foreground">Connecting Homes, Connecting People</span>
+          {/* Logo and Badge */}
+          <div className="flex flex-col items-center mb-6 animate-fade-up">
+            <div className="w-40 h-40 mb-4">
+              <img src="/logo.png" alt="HomeHive Logo" className="w-full h-full object-contain" />
+            </div>
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-card border border-border shadow-md">
+              <span className="w-2 h-2 rounded-full bg-emerald animate-pulse" />
+              <span className="text-sm font-medium text-muted-foreground">Your Hive of Housing Harmony</span>
+            </div>
           </div>
 
           {/* Headline */}
@@ -89,28 +105,33 @@ export function HeroSection() {
                 placeholder="Search by location, price, or property type..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                 className="flex-1 px-4 py-3 bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none"
               />
-              <Link to="/listings">
-                <Button variant="hero" size="lg">
-                  Search
-                </Button>
-              </Link>
+              <Button variant="hero" size="lg" onClick={handleSearch}>
+                Search
+              </Button>
             </div>
           </div>
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16 animate-fade-up" style={{ animationDelay: '300ms' }}>
-            <Link to="/listings">
-              <Button variant="hero" size="xl" className="w-full sm:w-auto">
-                Find a Home
-                <ArrowRight className="w-5 h-5" />
-              </Button>
-            </Link>
-            <Button variant="hero-outline" size="xl" className="w-full sm:w-auto">
-              List Your Property
-              <ArrowRight className="w-5 h-5" />
-            </Button>
+            {(!user || user.role === 'TENANT') && (
+              <Link to="/listings">
+                <Button variant="hero" size="xl" className="w-full sm:w-auto">
+                  Find a Home
+                  <ArrowRight className="w-5 h-5" />
+                </Button>
+              </Link>
+            )}
+            {(!user || user.role === 'LANDLORD') && (
+              <Link to={user ? "/add-property" : "/auth"}>
+                <Button variant="hero-outline" size="xl" className="w-full sm:w-auto">
+                  List Your Property
+                  <ArrowRight className="w-5 h-5" />
+                </Button>
+              </Link>
+            )}
           </div>
 
           {/* Stats */}

@@ -297,10 +297,10 @@ export default function LandlordDashboard() {
                 <CardContent>
                   <div className="space-y-4">
                     {[
-                      { label: 'Monthly Views', value: '12,450', change: '+23%', positive: true },
-                      { label: 'New Inquiries', value: '234', change: '+15%', positive: true },
-                      { label: 'Response Rate', value: '94%', change: '+5%', positive: true },
-                      { label: 'Avg. Time to Rent', value: '12 days', change: '-3 days', positive: true },
+                      { label: 'Total Views', value: data.total_views.toLocaleString(), change: '', positive: true },
+                      { label: 'Total Saves', value: data.total_saves.toLocaleString(), change: '', positive: true },
+                      { label: 'Total Reviews', value: data.total_reviews.toLocaleString(), change: '', positive: true },
+                      { label: 'Avg Rating', value: data.average_rating > 0 ? `${data.average_rating} ★` : '-', change: '', positive: true },
                     ].map((item, index) => (
                       <div
                         key={item.label}
@@ -310,9 +310,11 @@ export default function LandlordDashboard() {
                         <span className="text-muted-foreground">{item.label}</span>
                         <div className="flex items-center gap-2">
                           <span className="font-semibold text-foreground">{item.value}</span>
-                          <Badge variant={item.positive ? 'default' : 'destructive'} className="text-xs">
-                            {item.change}
-                          </Badge>
+                          {item.change && (
+                            <Badge variant={item.positive ? 'default' : 'destructive'} className="text-xs">
+                              {item.change}
+                            </Badge>
+                          )}
                         </div>
                       </div>
                     ))}

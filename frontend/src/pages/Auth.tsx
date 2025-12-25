@@ -214,46 +214,34 @@ const Auth = () => {
         <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4xIj48cGF0aCBkPSJNMzYgMzRoLTJ2LTRoMnY0em0wLTZ2LTRoLTJ2NGgyem0tNiA2aC00djJoNHYtMnptMC02di00aC00djRoNHptLTYgNnYyaDR2LTJoLTR6bTAtNmgtNHY0aDR2LTR6Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-30" />
 
         <div className="relative z-10">
-          <Link to="/" className="flex items-center gap-2 text-white mb-2">
-            <Home className="w-8 h-8" />
-            <span className="text-2xl font-bold">HomeHive</span>
+          <Link to="/" className="flex flex-col items-start gap-2 text-white mb-4">
+            <div className="w-48 h-48">
+              <img src="/logo.png" alt="HomeHive Logo" className="w-full h-full object-contain drop-shadow-lg" />
+            </div>
+            <span className="text-3xl font-extrabold tracking-tight drop-shadow-md">HomeHive</span>
           </Link>
-          <p className="text-white/80">Connecting Homes, Connecting People</p>
+          <p className="text-white text-lg font-medium drop-shadow-md">Your Hive of Housing Harmony</p>
         </div>
 
         <div className="relative z-10 space-y-8">
           <div className="animate-fade-in">
-            <h2 className="text-4xl font-bold text-white mb-4">
+            <h2 className="text-4xl font-bold text-white mb-4 drop-shadow-md">
               Find your perfect home today
             </h2>
-            <p className="text-white/80 text-lg">
+            <p className="text-white text-lg font-medium drop-shadow-md">
               Join thousands of landlords and tenants who trust HomeHive for their rental needs.
             </p>
           </div>
-
-          <div className="flex gap-8 text-white/90">
-            <div className="animate-fade-in" style={{ animationDelay: "0.1s" }}>
-              <div className="text-3xl font-bold">5K+</div>
-              <div className="text-sm text-white/70">Active Listings</div>
-            </div>
-            <div className="animate-fade-in" style={{ animationDelay: "0.2s" }}>
-              <div className="text-3xl font-bold">10K+</div>
-              <div className="text-sm text-white/70">Happy Users</div>
-            </div>
-            <div className="animate-fade-in" style={{ animationDelay: "0.3s" }}>
-              <div className="text-3xl font-bold">98%</div>
-              <div className="text-sm text-white/70">Satisfaction</div>
-            </div>
-          </div>
+          {/* Stats removed as requested */}
         </div>
 
         <div className="relative z-10 text-white/60 text-sm">
-          © 2024 HomeHive. All rights reserved.
+          © {new Date().getFullYear()} HomeHive. All rights reserved.
         </div>
       </div>
 
       {/* Right Side - Form */}
-      <div className="flex-1 flex items-center justify-center p-8">
+      <div className="flex-1 flex items-center justify-center p-8 bg-gradient-to-br from-background via-background to-primary/10 dark:from-zinc-900 dark:via-zinc-900 dark:to-primary/20">
         <div className="w-full max-w-md">
           {/* Back Link */}
           <Link
@@ -265,9 +253,11 @@ const Auth = () => {
           </Link>
 
           {/* Mobile Logo */}
-          <div className="lg:hidden flex items-center gap-2 text-primary mb-8">
-            <Home className="w-8 h-8" />
-            <span className="text-2xl font-bold">HomeHive</span>
+          <div className="lg:hidden flex flex-col items-start gap-2 mb-8">
+            <div className="w-16 h-16">
+              <img src="/logo.png" alt="HomeHive Logo" className="w-full h-full object-contain" />
+            </div>
+            <span className="text-2xl font-extrabold text-primary">HomeHive</span>
           </div>
 
           {/* Form Header */}

@@ -34,10 +34,20 @@ class MessageSerializer(serializers.ModelSerializer):
 
     def get_property_details(self, obj):
         if obj.property:
+            # Use the same logic as PropertyListSerializer to get cover image
+            cover = obj.property.images.filter(is_cover=True).first()
+            image_url = None
+            if cover:
+                image_url = cover.image_url
+            else:
+                first_image = obj.property.images.first()
+                if first_image:
+                    image_url = first_image.image_url
+                    
             return {
                 'id': obj.property.id,
                 'title': obj.property.title,
-                'cover_image': obj.property.cover_image.url if obj.property.cover_image else None
+                'cover_image': image_url
             }
         return None
 
@@ -60,7 +70,7 @@ class ChatRoomSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'updated_at']
     
     def get_last_message(self, obj):
-        last_message = obj.messages.last()
+        last_message = obj.messages.order_by('-timestamp').first()
         if last_message:
             return MessageSerializer(last_message).data
         return None

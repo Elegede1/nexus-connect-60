@@ -20,6 +20,14 @@ class Notification(models.Model):
         on_delete=models.CASCADE,
         related_name='notifications'
     )
+    sender = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='sent_notifications',
+        null=True,
+        blank=True,
+        help_text="User who triggered this notification (message sender or property owner)"
+    )
     type = models.CharField(max_length=20, choices=NotificationType.choices)
     title = models.CharField(max_length=255)
     message = models.TextField()

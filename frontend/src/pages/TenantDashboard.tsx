@@ -23,20 +23,35 @@ const NIGERIA_LOCATIONS: Record<string, string[]> = {
   // Add more as needed
 };
 
-interface Property {
+interface SavedPropertyData {
   id: number;
-  title: string;
-  price: number;
-  location: string;
-  beds: number;
-  baths: number;
-  sqft: number;
-  image: string;
+  property: {
+    id: number;
+    title: string;
+    price: number;
+    location: string;
+    state: string;
+    city: string;
+    property_type: string;
+    num_bedrooms: number;
+    num_bathrooms: number;
+    num_toilets: number;
+    cover_image: string | null;
+    landlord_name: string;
+    amenities_list: string[];
+    view_count: number;
+    save_count: number;
+    is_saved: boolean;
+    review_count: number;
+    average_rating: number;
+    created_at: string;
+  };
+  saved_at: string;
 }
 
 export default function TenantDashboard() {
   const { user } = useAuth();
-  const [savedProperties, setSavedProperties] = useState<Property[]>([]);
+  const [savedProperties, setSavedProperties] = useState<SavedPropertyData[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Filters
@@ -44,13 +59,52 @@ export default function TenantDashboard() {
   const [selectedCity, setSelectedCity] = useState<string>("");
 
   useEffect(() => {
-    // Simulate fetching saved properties
-    // In real implementation, fetch from /api/properties/saved/
-    setTimeout(() => {
-      setSavedProperties([]); // Initialize to 0 as requested
-      setLoading(false);
-    }, 1000);
+    fetchSavedProperties();
   }, []);
+
+  const fetchSavedProperties = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('access_token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/properties/saved/`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // Handle paginated response
+        const properties = Array.isArray(data) ? data : (data.results || []);
+        setSavedProperties(properties);
+      }
+    } catch (error) {
+      console.error('Error fetching saved properties:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUnsave = async (propertyId: number) => {
+    try {
+      const token = localStorage.getItem('access_token');
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/properties/${propertyId}/save/`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        // Remove from local state
+        setSavedProperties(prev => prev.filter(sp => sp.property.id !== propertyId));
+      }
+    } catch (error) {
+      console.error('Error unsaving property:', error);
+    }
+  };
 
   const handleSearch = () => {
     // Implement search logic or navigation to listings with query params
@@ -147,26 +201,36 @@ export default function TenantDashboard() {
               </div>
             ) : (
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {savedProperties.map((property) => (
-                  <Card key={property.id} className="overflow-hidden hover:shadow-lg transition-all">
+                {savedProperties.map((saved) => (
+                  <Card key={saved.id} className="overflow-hidden hover:shadow-lg transition-all">
                     <div className="relative h-48">
-                      <img src={property.image} alt={property.title} className="w-full h-full object-cover" />
+                      <img
+                        src={saved.property.cover_image || '/placeholder-property.jpg'}
+                        alt={saved.property.title}
+                        className="w-full h-full object-cover"
+                      />
+                      <button
+                        onClick={() => handleUnsave(saved.property.id)}
+                        className="absolute top-3 right-3 bg-white/90 hover:bg-white p-2 rounded-full shadow-md transition-all"
+                        title="Remove from saved"
+                      >
+                        <Heart className="w-5 h-5 text-destructive fill-destructive" />
+                      </button>
                       <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-3">
-                        <span className="text-white font-bold text-lg">{formatNaira(property.price)}/yr</span>
+                        <span className="text-white font-bold text-lg">{formatNaira(saved.property.price)}/yr</span>
                       </div>
                     </div>
                     <CardContent className="p-4">
-                      <h3 className="font-semibold truncate">{property.title}</h3>
+                      <h3 className="font-semibold truncate">{saved.property.title}</h3>
                       <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
-                        <MapPin className="w-3 h-3" /> {property.location}
+                        <MapPin className="w-3 h-3" /> {saved.property.city}, {saved.property.state}
                       </p>
                       <div className="flex gap-3 mt-3 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1"><Bed className="w-3 h-3" /> {property.beds}</span>
-                        <span className="flex items-center gap-1"><Bath className="w-3 h-3" /> {property.baths}</span>
-                        <span className="flex items-center gap-1"><Square className="w-3 h-3" /> {property.sqft}m²</span>
+                        <span className="flex items-center gap-1"><Bed className="w-3 h-3" /> {saved.property.num_bedrooms}</span>
+                        <span className="flex items-center gap-1"><Bath className="w-3 h-3" /> {saved.property.num_bathrooms}</span>
                       </div>
                       <Button className="w-full mt-4" variant="outline" asChild>
-                        <Link to={`/property/${property.id}`}>View Details</Link>
+                        <Link to={`/property/${saved.property.id}`}>View Details</Link>
                       </Button>
                     </CardContent>
                   </Card>

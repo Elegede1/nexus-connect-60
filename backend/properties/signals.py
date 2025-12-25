@@ -35,6 +35,15 @@ def notify_price_change(sender, instance, created, **kwargs):
         saved_properties = SavedProperty.objects.filter(property=instance).select_related('tenant')
         
         notifications = []
+        # Delete obsolete notifications first for users who are about to receive a new one
+        # Because this is a list of users, we can proactively clear their notifications for this property
+        tenant_ids = [sp.tenant.id for sp in saved_properties]
+        Notification.objects.filter(
+            user_id__in=tenant_ids,
+            type=Notification.NotificationType.PROPERTY_UPDATE,
+            related_property_id=instance.id
+        ).delete()
+
         for sp in saved_properties:
             notifications.append(
                 Notification(
@@ -77,6 +86,14 @@ def notify_followers_on_property_activity(sender, instance, created, **kwargs):
         # A follower might not have saved this property yet.
         title = "Property Updated"
         message = f"{landlord.first_name} {landlord.last_name} has updated the property: '{instance.title}'."
+
+    # Delete obsolete notifications first for followers
+    follower_ids = [f.follower.id for f in followers]
+    Notification.objects.filter(
+        user_id__in=follower_ids,
+        type=Notification.NotificationType.PROPERTY_UPDATE,
+        related_property_id=instance.id
+    ).delete()
 
     for follow in followers:
         notifications.append(

@@ -35,16 +35,16 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-12">
           {/* Brand */}
           <div className="lg:col-span-2">
-            <Link to="/" className="flex items-center gap-2 mb-4">
-              <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center">
-                <Building2 className="w-5 h-5 text-white" />
+            <Link to="/" className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 flex items-center justify-center">
+                <img src="/logo.png" alt="HomeHive Logo" className="w-full h-full object-contain" />
               </div>
               <span className="text-xl font-bold text-foreground">
                 Home<span className="text-emerald">Hive</span>
               </span>
             </Link>
             <p className="text-muted-foreground mb-6 max-w-sm">
-              Connecting homes, connecting people. Your perfect rental match is just a click away.
+              Your Hive of Housing Harmony. Find your perfect rental match with just a click.
             </p>
 
             {/* Contact Info */}

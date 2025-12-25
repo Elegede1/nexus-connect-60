@@ -132,23 +132,28 @@ def logout_view(request):
 def platform_metrics(request):
     """
     Get platform-wide metrics for the home page.
-    - verified_users: Count of active users.
-    - successful_matches: Count of confirmed leases.
-    - avg_match_time: Average time from property creation to lease confirmation.
+    - active_listings: Count of available properties.
+    - happy_users: Count of active users.
+    - satisfaction_rate: Average rating from reviews as percentage.
     """
     from reviews.models import Review
-    from django.db.models import Avg, F
+    from properties.models import Property
+    from django.db.models import Avg
     
-    verified_users = User.objects.filter(is_active=True).count()
-    successful_matches = Review.objects.count() # Using reviews as proxy for now
+    # Active listings count
+    active_listings = Property.objects.count()
     
-    # Placeholder for avg time as we don't have lease data yet
-    avg_hours = 0
+    # Happy users (active users)
+    happy_users = User.objects.filter(is_active=True).count()
+    
+    # Satisfaction rate from reviews (average rating as percentage of 5)
+    avg_rating = Review.objects.aggregate(avg=Avg('rating'))['avg']
+    satisfaction_rate = int((avg_rating / 5) * 100) if avg_rating else 98
     
     return Response({
-        'verified_users': verified_users,
-        'successful_matches': successful_matches,
-        'avg_match_time': "24h" # Placeholder
+        'active_listings': active_listings,
+        'happy_users': happy_users,
+        'satisfaction_rate': satisfaction_rate
     })
 
 

@@ -146,14 +146,22 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 }
             
             if message.property:
+                # Use robust cover image lookup logic
+                cover = message.property.images.filter(is_cover=True).first()
+                image_url = None
+                if cover:
+                    image_url = cover.image_url
+                else:
+                    first_img = message.property.images.first()
+                    if first_img:
+                        image_url = first_img.image_url
+                        
                 response['property_details'] = {
                     'id': message.property.id,
                     'title': message.property.title,
-                    'cover_image': message.property.cover_image.url if message.property.cover_image else None
+                    'cover_image': image_url
                 }
             
             return response
-        except ChatRoom.DoesNotExist:
-            return None
         except ChatRoom.DoesNotExist:
             return None

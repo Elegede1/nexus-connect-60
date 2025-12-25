@@ -24,7 +24,8 @@ import {
   Edit,
   Shield,
   Loader2,
-  Users
+  Users,
+  Heart
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
@@ -41,6 +42,7 @@ const LandlordProfile = () => {
     averageRating: 0,
     totalReviews: 0,
   });
+  const [analyticsData, setAnalyticsData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -70,28 +72,28 @@ const LandlordProfile = () => {
         setProfileData(data);
         setProperties(data.properties || []);
 
-        // Update stats from profile data properties
-        if (data.properties) {
-          const totalViews = data.properties.reduce((acc: number, curr: any) => acc + (curr.view_count || 0), 0);
-          setStats(prev => ({
-            ...prev,
-            totalProperties: data.properties.length,
-            totalViews,
-          }));
+        // 2. Fetch Analytics
+        const analyticsRes = await fetch(`${API_URL}/api/properties/analytics/`, {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (analyticsRes.ok) {
+          const aData = await analyticsRes.json();
+          setAnalyticsData(aData);
+          setStats({
+            totalProperties: aData.total_properties,
+            totalViews: aData.total_views,
+            averageRating: aData.average_rating,
+            totalReviews: aData.total_reviews,
+          });
         }
 
-        // 2. Fetch Reviews for aggregate stats
+        // 3. Fetch Reviews
         const reviewsRes = await fetch(`${API_URL}/api/reviews/landlord/${data.id}/`, {
           headers: { 'Authorization': `Bearer ${token}` },
         });
         if (reviewsRes.ok) {
           const reviewData = await reviewsRes.json();
           setReviews(reviewData.reviews || []);
-          setStats(prev => ({
-            ...prev,
-            averageRating: reviewData.average_rating || 0,
-            totalReviews: reviewData.total_reviews || 0
-          }));
         }
       }
 
@@ -233,45 +235,7 @@ const LandlordProfile = () => {
                 </CardContent>
               </Card>
 
-              {/* Quick Stats */}
-              <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
-                <CardHeader>
-                  <CardTitle className="text-lg">Performance Overview</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                    <div className="flex items-center gap-3">
-                      <Eye className="w-5 h-5 text-primary" />
-                      <span className="text-sm">Total Views</span>
-                    </div>
-                    <span className="font-bold text-foreground">{stats.totalViews.toLocaleString()}</span>
-                  </div>
 
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                    <div className="flex items-center gap-3">
-                      <Users className="w-5 h-5 text-blue-500" />
-                      <span className="text-sm">Followers</span>
-                    </div>
-                    <span className="font-bold text-foreground">{profileData?.followers_count || 0}</span>
-                  </div>
-
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                    <div className="flex items-center gap-3">
-                      <MessageSquare className="w-5 h-5 text-secondary" />
-                      <span className="text-sm">Reviews</span>
-                    </div>
-                    <span className="font-bold text-foreground">{stats.totalReviews}</span>
-                  </div>
-
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                    <div className="flex items-center gap-3">
-                      <Star className="w-5 h-5 text-amber-500" />
-                      <span className="text-sm">Avg Rating</span>
-                    </div>
-                    <span className="font-bold text-foreground">{stats.averageRating.toFixed(1)}</span>
-                  </div>
-                </CardContent>
-              </Card>
 
               {/* Premium Upgrade */}
               <Card className="border-amber-500/30 bg-gradient-to-br from-amber-500/10 to-orange-500/10 overflow-hidden relative">
@@ -375,13 +339,73 @@ const LandlordProfile = () => {
                 )}
 
                 {activeTab === "analytics" && (
-                  <div className="space-y-6">
-                    {/* Analytics Empty State */}
-                    <div className="text-center py-12 bg-muted/30 rounded-xl border border-dashed border-border">
-                      <BarChart3 className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-50" />
-                      <h3 className="text-lg font-medium text-foreground">No analytics data</h3>
-                      <p className="text-muted-foreground">Stats will appear here once your properties get views</p>
-                    </div>
+                  <div className="grid md:grid-cols-2 gap-6 animate-fade-in">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <TrendingUp className="w-5 h-5 text-emerald" />
+                          Performance Overview
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-4">
+                          {[
+                            { label: 'Total Views', value: analyticsData?.total_views.toLocaleString() || '0', icon: Eye, color: 'text-primary' },
+                            { label: 'Total Saves', value: analyticsData?.total_saves.toLocaleString() || '0', icon: Heart, color: 'text-emerald' },
+                            { label: 'Properties', value: analyticsData?.total_properties || '0', icon: Building2, color: 'text-amber' },
+                            { label: 'Avg Rating', value: analyticsData?.average_rating > 0 ? `${analyticsData.average_rating} ★` : '-', icon: Star, color: 'text-violet' },
+                          ].map((item, index) => (
+                            <div
+                              key={item.label}
+                              className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                              style={{ animationDelay: `${index * 100}ms` }}
+                            >
+                              <div className="flex items-center gap-3">
+                                <item.icon className={`w-4 h-4 ${item.color}`} />
+                                <span className="text-muted-foreground">{item.label}</span>
+                              </div>
+                              <span className="font-semibold text-foreground">{item.value}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <BarChart3 className="w-5 h-5 text-primary" />
+                          Property Performance
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-4">
+                          {analyticsData?.properties?.length > 0 ? (
+                            analyticsData.properties.slice(0, 5).map((property: any, index: number) => (
+                              <div key={property.id} className="space-y-2">
+                                <div className="flex justify-between text-sm">
+                                  <span className="text-muted-foreground truncate pr-2">{property.title}</span>
+                                  <span className="font-medium text-foreground">{property.view_count || 0} views</span>
+                                </div>
+                                <div className="h-2 bg-muted rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-gradient-to-r from-primary to-emerald rounded-full transition-all duration-1000"
+                                    style={{
+                                      width: `${Math.min(100, ((property.view_count || 0) / (Math.max(...analyticsData.properties.map((p: any) => p.view_count || 0), 100))) * 100)}%`,
+                                      animationDelay: `${index * 200}ms`
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="text-center py-6 text-muted-foreground">
+                              No property data available
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
                   </div>
                 )}
 

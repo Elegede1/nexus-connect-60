@@ -1,7 +1,10 @@
 import { ArrowRight, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/context/AuthContext';
+import { Link } from 'react-router-dom';
 
 export function CTASection() {
+  const { user } = useAuth();
   return (
     <section className="py-24 relative overflow-hidden">
       {/* Background Elements */}
@@ -23,25 +26,31 @@ export function CTASection() {
           </h2>
 
           <p className="text-lg text-white/80 mb-10 animate-fade-up" style={{ animationDelay: '200ms' }}>
-            Join thousands of landlords and tenants who've found their ideal rental connections. 
+            Join thousands of landlords and tenants who've found their ideal rental connections.
             Sign up for free and get started in minutes.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-fade-up" style={{ animationDelay: '300ms' }}>
-            <Button 
-              size="xl" 
-              className="w-full sm:w-auto bg-white text-deep-blue hover:bg-white/90 hover:-translate-y-1 shadow-lg hover:shadow-xl"
-            >
-              Create Free Account
-              <ArrowRight className="w-5 h-5" />
-            </Button>
-            <Button 
-              variant="outline" 
-              size="xl" 
-              className="w-full sm:w-auto border-2 border-white/30 text-white hover:bg-white/10 hover:border-white/50"
-            >
-              Learn More
-            </Button>
+            {!user && (
+              <Link to="/auth" className="w-full sm:w-auto">
+                <Button
+                  size="xl"
+                  className="w-full bg-white text-deep-blue hover:bg-white/90 hover:-translate-y-1 shadow-lg hover:shadow-xl"
+                >
+                  Create Free Account
+                  <ArrowRight className="w-5 h-5" />
+                </Button>
+              </Link>
+            )}
+            <Link to="/about" className="w-full sm:w-auto">
+              <Button
+                variant="outline"
+                size="xl"
+                className="w-full border-2 border-white/30 text-white hover:bg-white/10 hover:border-white/50"
+              >
+                Learn More
+              </Button>
+            </Link>
           </div>
         </div>
       </div>

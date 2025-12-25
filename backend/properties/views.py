@@ -191,10 +191,10 @@ class LandlordPropertiesView(generics.ListAPIView):
         return Property.objects.filter(landlord=self.request.user).prefetch_related('images')
 
 
-@api_view(['POST'])
+@api_view(['POST', 'DELETE'])
 @permission_classes([IsAuthenticated])
 def save_property(request, pk):
-    """Save/bookmark a property (tenants only)"""
+    """Save/bookmark a property (POST) or remove from saved (DELETE)"""
     if not request.user.is_tenant():
         return Response(
             {'error': 'Only tenants can save properties'},
@@ -209,7 +209,17 @@ def save_property(request, pk):
             status=status.HTTP_404_NOT_FOUND
         )
     
-    # Check if already saved
+    # Handle DELETE - unsave property
+    if request.method == 'DELETE':
+        try:
+            saved = SavedProperty.objects.get(tenant=request.user, property=property_obj)
+            saved.delete()
+            property_obj.decrement_saves()
+            return Response({'message': 'Property removed from saved'}, status=status.HTTP_200_OK)
+        except SavedProperty.DoesNotExist:
+            return Response({'error': 'Property not in saved list'}, status=status.HTTP_404_NOT_FOUND)
+    
+    # Handle POST - save property
     saved, created = SavedProperty.objects.get_or_create(
         tenant=request.user,
         property=property_obj

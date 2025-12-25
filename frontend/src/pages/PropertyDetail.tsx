@@ -669,71 +669,75 @@ export default function PropertyDetail() {
                             {contacting ? 'Starting Chat...' : 'Message Landlord'}
                           </Button>
                         )}
-                        <Dialog open={isReviewOpen} onOpenChange={setIsReviewOpen}>
-                          <DialogTrigger asChild>
-                            <Button variant="outline" className="w-full">
-                              <Star className="w-4 h-4 mr-2" />
-                              Rate Landlord
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent>
-                            <DialogHeader>
-                              <DialogTitle>Rate Landlord</DialogTitle>
-                            </DialogHeader>
-                            <div className="space-y-4 py-4">
-                              <div className="flex flex-col gap-2">
-                                <Label>Rating</Label>
-                                <div className="flex gap-2">
-                                  {[1, 2, 3, 4, 5].map((star) => (
-                                    <button
-                                      key={star}
-                                      type="button"
-                                      onClick={() => setReviewRating(star)}
-                                      className="focus:outline-none transition-transform hover:scale-110"
-                                    >
-                                      <Star
-                                        className={cn(
-                                          "w-8 h-8 transition-colors",
-                                          star <= reviewRating ? "fill-amber-500 text-amber-500" : "text-muted-foreground"
-                                        )}
-                                      />
-                                    </button>
-                                  ))}
+                        {user && (
+                          <>
+                            <Dialog open={isReviewOpen} onOpenChange={setIsReviewOpen}>
+                              <DialogTrigger asChild>
+                                <Button variant="outline" className="w-full">
+                                  <Star className="w-4 h-4 mr-2" />
+                                  Rate Landlord
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent>
+                                <DialogHeader>
+                                  <DialogTitle>Rate Landlord</DialogTitle>
+                                </DialogHeader>
+                                <div className="space-y-4 py-4">
+                                  <div className="flex flex-col gap-2">
+                                    <Label>Rating</Label>
+                                    <div className="flex gap-2">
+                                      {[1, 2, 3, 4, 5].map((star) => (
+                                        <button
+                                          key={star}
+                                          type="button"
+                                          onClick={() => setReviewRating(star)}
+                                          className="focus:outline-none transition-transform hover:scale-110"
+                                        >
+                                          <Star
+                                            className={cn(
+                                              "w-8 h-8 transition-colors",
+                                              star <= reviewRating ? "fill-amber-500 text-amber-500" : "text-muted-foreground"
+                                            )}
+                                          />
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                  <div className="flex flex-col gap-2">
+                                    <Label htmlFor="comment">Comment</Label>
+                                    <Textarea
+                                      id="comment"
+                                      value={reviewComment}
+                                      onChange={(e) => setReviewComment(e.target.value)}
+                                      placeholder="Share your experience with this landlord..."
+                                      rows={4}
+                                    />
+                                  </div>
                                 </div>
-                              </div>
-                              <div className="flex flex-col gap-2">
-                                <Label htmlFor="comment">Comment</Label>
-                                <Textarea
-                                  id="comment"
-                                  value={reviewComment}
-                                  onChange={(e) => setReviewComment(e.target.value)}
-                                  placeholder="Share your experience with this landlord..."
-                                  rows={4}
-                                />
-                              </div>
-                            </div>
-                            <DialogFooter>
-                              <Button variant="outline" onClick={() => setIsReviewOpen(false)}>Cancel</Button>
-                              <Button onClick={handleSubmitReview} disabled={submittingReview}>
-                                {submittingReview ? <Loader2 className="w-4 h-4 animate-spin" /> : "Submit Review"}
-                              </Button>
-                            </DialogFooter>
-                          </DialogContent>
-                        </Dialog>
-                        <Button
-                          variant="outline"
-                          className="w-full"
-                          onClick={() => {
-                            if (property.landlord?.phone_number) {
-                              window.location.href = `tel:${property.landlord.phone_number}`;
-                            } else {
-                              toast({ title: "No Phone Number", description: "Landlord hasn't provided a phone number.", variant: "destructive" });
-                            }
-                          }}
-                        >
-                          <Phone className="w-4 h-4 mr-2" />
-                          {property.landlord?.phone_number ? "Call Landlord" : "Number Unavailable"}
-                        </Button>
+                                <DialogFooter>
+                                  <Button variant="outline" onClick={() => setIsReviewOpen(false)}>Cancel</Button>
+                                  <Button onClick={handleSubmitReview} disabled={submittingReview}>
+                                    {submittingReview ? <Loader2 className="w-4 h-4 animate-spin" /> : "Submit Review"}
+                                  </Button>
+                                </DialogFooter>
+                              </DialogContent>
+                            </Dialog>
+                            <Button
+                              variant="outline"
+                              className="w-full"
+                              onClick={() => {
+                                if (property.landlord?.phone_number) {
+                                  window.location.href = `tel:${property.landlord.phone_number}`;
+                                } else {
+                                  toast({ title: "No Phone Number", description: "Landlord hasn't provided a phone number.", variant: "destructive" });
+                                }
+                              }}
+                            >
+                              <Phone className="w-4 h-4 mr-2" />
+                              {property.landlord?.phone_number ? "Call Landlord" : "Number Unavailable"}
+                            </Button>
+                          </>
+                        )}
                       </>
                     )}
                   </div>
